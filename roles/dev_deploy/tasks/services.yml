@@ -1,0 +1,58 @@
+---
+
+- name: Check if docker-compose command exists
+  shell: "command -v docker-compose || echo not found"
+  register: docker_compose_command
+  changed_when: False
+
+- name: Find docker-compose
+  shell: "find / -name 'docker-compose' -executable -type f -print -quit 2>/dev/null | head -n 1"
+  register: docker_compose_find
+  when: docker_compose_command.stdout == "not found"
+  ignore_errors: true
+  changed_when: False
+
+- name: Set docker_compose variable to found path
+  set_fact:
+    docker_compose: "{{ docker_compose_find.stdout_lines[0] }}"
+  when: docker_compose_command.stdout == "not found"
+
+- name: Set docker_compose variable to command output
+  set_fact:
+    docker_compose: "{{ docker_compose_command.stdout }}"
+  when: docker_compose_command.stdout != "not found"
+
+- name: Create and start services
+  block:
+    - name: Get list of services
+      shell: "{{ docker_compose }} -p {{ container_name_prefix }} config --services"
+      args:
+        chdir: "{{ sources_root }}/albs-web-server"
+      register: services
+
+    - name: Create and start each service individually
+      shell: "{{ docker_compose }} -p {{ container_name_prefix }} up -d --build --force-recreate {{ item }}"
+      args:
+        chdir: "{{ sources_root }}/albs-web-server"
+      when: item not in excluded_containers
+      loop: "{{ services.stdout_lines }}"
+  when:
+    - docker_compose != "not found"
+    - excluded_containers
+
+- name: Create and start services
+  shell: "{{ docker_compose }} -p {{ container_name_prefix }} --compatibility up -d --build --force-recreate"
+  args:
+    chdir: "{{ sources_root }}/albs-web-server"
+  register: output
+  when:
+    - docker_compose != "not found"
+    - not excluded_containers or excluded_containers == ""
+
+- debug:
+    var: output
+
+- name: Fail if docker-compose not found
+  fail:
+    msg: "docker-compose not found"
+  when: docker_compose == "not found"

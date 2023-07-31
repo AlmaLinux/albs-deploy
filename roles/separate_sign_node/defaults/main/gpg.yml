@@ -1,0 +1,9 @@
+gpg_default_password: "1234567890"
+gpg_default_email: "test@albs.local"
+
+gpg_key_scenario:
+  name: gpg-key-scenario
+  dest: "{{ home_dir }}"
+  owner: "{{ service_user }}"
+  group: "{{ service_group }}"
+  mode: 0664

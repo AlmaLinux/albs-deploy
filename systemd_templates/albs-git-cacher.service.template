@@ -1,0 +1,21 @@
+[Unit]
+Description=ALBS git cacher service
+# Put redis service name here
+# After=redis.service
+
+[Service]
+Type=simple
+Restart=always
+RestartSec=10
+User=root
+# Adjust path to local copy of albs-web-server
+WorkingDirectory=/home/user/albs-web-server/
+Environment="REDIS_URL=redis://redis:6379"
+# Adjust path to python virtual environmet,
+# python should have version 3.7 or greater
+# and includes dependencies for git_cacher
+ExecStart=/bin/bash -c 'PYTHONPATH="." /home/user/venv/bin/python3 alws/scripts/git_cacher/git_cacher.py'
+
+[Install]
+WantedBy=multi-user.target
+

@@ -1,0 +1,55 @@
+---
+
+# Needed for whole setup as dev node or when you're trying to setup everything at once
+albs_address: <IP or hostname of ALBS VM>
+build_node_address: <IP or hostname of ALBS build node VM. Can be empty if you are planning use docker for a build node>
+
+
+# should be defined if you want deploy separate build node
+build_node_working_directory: <path to the working directory of build node which deployed to separate vm>
+build_node_venv_directory: <path to the python venv of build node>
+
+use_local_connection: true|false <up docker containers on a host machine>
+use_already_cloned_repos: true|false <use local sources from already cloned repos>
+local_sources_root: <folder with cloned repositories; can be empty if you use cloning of sources from GH>
+local_volumes_root: <folder with mounts for docker containers; can be empty if you use cloning of sources from GH>
+ansible_interpreter_path: <path to python interpreter on a destination host>
+
+# playbook generates a key itself if the var is empty
+pgp_keys:
+    - <last_16_digits_of_keys_fingerprint>
+
+postgres_password:
+postgres_db:
+postgres_user:
+
+github_client:
+github_client_secret:
+
+alts_jwt_token:
+albs_jwt_token:
+albs_jwt_secret:
+alts_jwt_secret:
+
+rabbitmq_erlang_cookie:
+rabbitmq_user:
+rabbitmq_pass:
+rabbitmq_vhost:
+
+pulp_password:
+cas_api_key:
+cas_signer_id:
+
+
+# These variables are used when deploying a separate build node
+os_version:         # version of EL distro to use (8, 9)
+cas_version:        # version of CAS binary to download
+cas_architecture:   # architecture of CAS binary (amd64, arm64, ppc64le, s390x)
+thread_count:       # Number of the build threads that will be running on the node
+service_user:       # User that will own build node code and under which the service will be running
+service_group:      # Service user's group
+cas_api_key:
+cas_signer_id:
+albs_jwt_token:
+pulp_user:
+pulp_password:

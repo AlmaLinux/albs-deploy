@@ -1,0 +1,7 @@
+---
+build_node_working_directory: "{{ build_node_working_directory }}"
+build_node_venv_directory: "{{ build_node_venv_directory }}"
+service_group: "{{ service_group }}"
+service_user: "{{ service_user }}"
+...
+

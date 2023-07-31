@@ -1,0 +1,21 @@
+---
+- name: Deploy the ALBS
+  hosts: albs_vm
+  vars:
+    - excluded_containers:
+        - "build_node"
+  roles:
+    - dev_deploy
+  tags:
+    - web-server-deploy
+  connection: "{{ 'local' if use_local_connection else 'ssh' }}"
+
+- name: Deploy the separate build node of ALBS
+  hosts: build_node_vm
+  roles:
+    - separate_build_node
+    - { role: ezamriy.fail2ban, fail2ban_ignoreip: '127.0.0.1/8 192.168.0.0/24' }
+  tags:
+    - build-node-deploy
+  connection: "{{ 'local' if use_local_connection else 'ssh' }}"
+...

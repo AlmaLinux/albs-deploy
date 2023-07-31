@@ -1,0 +1,30 @@
+sources_root: "{{ local_sources_root if use_already_cloned_repos and use_local_connection else '~/albs' }}"
+volumes_root: "{{ local_volumes_root if use_already_cloned_repos and use_local_connection else '~/albs/volumes' }}"
+folder_name_for_result_backend: "/mnt"
+result_backend: "{{ 'file:///' + folder_name_for_result_backend }}"
+pulp_user: "admin"
+
+created_directories:
+  - path: "{{ sources_root }}"
+    mode: "0755"
+  - path: "{{ volumes_root }}"
+    mode: "0755"
+  - path: "{{ volumes_root }}/configs"
+    mode: "0755"
+#  - path: "{{ volumes_root }}/{{ folder_name_for_result_backend }}"
+#    mode: "0755"
+  - path: "{{ volumes_root }}/pulp/settings"
+    mode: "0755"
+  - path: "{{ sources_root }}/albs-sign-node/node-config"
+    mode: "0755"
+  - path: "{{ sources_root }}/albs-node/node-config/castor"
+    mode: "0755"
+  - path: "{{ sources_root }}/nginx_configs"
+    mode: "0755"
+  - path: "{{ sources_root }}/alts/configs"
+    mode: "0755"
+
+packages:
+  - "gnupg"
+
+postgres_password: "{{ postgres_password | urlencode  }}"

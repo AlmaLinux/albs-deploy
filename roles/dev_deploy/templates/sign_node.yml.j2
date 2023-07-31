@@ -1,0 +1,16 @@
+---
+pgp_keys: {{ gpg_keys }}
+jwt_token: "{{ albs_jwt_token }}"
+pulp_host: "http://pulp"
+pulp_user: "{{ pulp_user }}"
+pulp_password: "{{ pulp_password }}"
+development_mode: true
+dev_pgp_key_password: "{{ gpg_default_password }}"
+master_url: "http://{{ container_name_prefix }}_web_server_1:8000/api/v1/"
+ws_master_url: "ws://{{ container_name_prefix }}_web_server_1:8000/api/v1/"
+{% if cas_api_key is defined %}
+cas_api_key: {{ cas_api_key }}
+{% endif %}
+{% if cas_signer_id is defined %}
+cas_signer_id: {{ cas_signer_id }}
+{% endif %}

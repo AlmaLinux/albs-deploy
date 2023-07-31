@@ -1,0 +1,7 @@
+albs_repos:
+  albs-frontend: git@github.com:AlmaLinux/albs-frontend.git
+  albs-node: git@github.com:AlmaLinux/albs-node.git
+  albs-web-server: git@github.com:AlmaLinux/albs-web-server.git
+  albs-sign-node: git@github.com:AlmaLinux/albs-sign-node.git
+  repo-beholder: git@github.com:AlmaLinux/repo-beholder.git
+  alts: git@github.com:AlmaLinux/alts.git

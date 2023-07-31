@@ -1,0 +1,27 @@
+---
+
+- name: Get already existing GPG key's fingerprint
+  shell: "gpg --list-keys test@albs.local | head -n 2 | tail -1"
+  register: gpg_key_fingerprint
+
+- name: Generate a GPG scenario
+  template:
+    dest: "{{ gpg_key_scenario.dest }}/{{ gpg_key_scenario.name }}"
+    src: "{{ gpg_key_scenario.name }}.j2"
+    owner: "{{ gpg_key_scenario.owner }}"
+#    group: "{{ gpg_key_scenario.group }}"
+    mode: "{{ gpg_key_scenario.mode }}"
+    force: yes
+
+- name: Generate GPG key
+  shell: "gpg --batch --gen-key {{ gpg_key_scenario.dest }}/{{ gpg_key_scenario.name }}"
+  when: gpg_key_fingerprint.stdout == ""
+
+- name: Get already existing GPG key's fingerprint
+  shell: "gpg --list-keys test@albs.local | head -n 2 | tail -1"
+  register: gpg_key_fingerprint
+
+- name: Set GPG key
+  set_fact:
+    gpg_keys:
+      - "{{ gpg_key_fingerprint.stdout[-16:] }}"

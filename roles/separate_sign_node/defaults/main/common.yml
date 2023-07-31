@@ -1,0 +1,20 @@
+---
+#threads_count: 4
+cas_version: 1.0.2
+cas_architecture: amd64
+base_work_dir: "/srv/alternatives"
+home_dir: "/home/{{ service_user }}"
+base_conf_dir: "{{ home_dir }}/.config"
+final_conf_dir: "{{ base_conf_dir }}"
+sign_node_working_directory: "{{ home_dir }}/albs"
+sign_node_venv_directory: "{{ sign_node_working_directory }}/venv"
+sign_node_requirements_path: "{{ sign_node_working_directory }}/albs-sign-node/requirements.txt"
+working_directories:
+  - "{{ base_work_dir }}"
+  - "{{ sign_node_working_directory }}"
+  - "{{ sign_node_venv_directory }}"
+  - "{{ base_work_dir }}/sign_node"
+  - "{{ final_conf_dir }}"
+service_group: "alt"
+service_user: "alt"
+...

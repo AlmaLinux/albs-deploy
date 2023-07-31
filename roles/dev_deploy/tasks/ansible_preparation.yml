@@ -1,0 +1,6 @@
+---
+- name: Install DNF packages for right works of Ansible
+  package:
+    name: "{{ playbook_packages }}"
+    state: present
+  become: "yes"

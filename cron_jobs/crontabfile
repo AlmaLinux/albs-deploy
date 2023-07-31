@@ -1,0 +1,4 @@
+MAILTO="admin@almalinux.com,admin2@almalinux.com"
+SHELL=/bin/bash
+PATH=/sbin:/bin:/usr/sbin:/usr/bin
+@daily <user> <path_to_backup_script>/make_backup.sh

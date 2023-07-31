@@ -1,0 +1,14 @@
+[Unit]
+Description=ALBS Sign Node
+
+[Service]
+RemainAfterExit=no
+Restart=on-failure
+RestartSec=5s
+Type=simple
+User={{ service_user }}
+Group={{ service_group }}
+ExecStart={{ sign_node_venv_directory }}/bin/python3 {{ sign_node_working_directory }}/albs-sign-node/almalinux_sign_node.py -v
+
+[Install]
+WantedBy=multi-user.target

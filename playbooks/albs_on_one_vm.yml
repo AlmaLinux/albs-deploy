@@ -1,0 +1,7 @@
+---
+- name: Deploy the ALBS
+  hosts: all
+  roles:
+    - dev_deploy
+  connection: "{{ 'local' if use_local_connection else 'ssh' }}"
+...

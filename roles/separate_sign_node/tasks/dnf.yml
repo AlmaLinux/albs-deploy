@@ -1,0 +1,36 @@
+---
+- name: Create signnode.repo in /etc/yum.repos.d/
+  copy:
+    content: |
+      [signnode]
+      baseurl = https://repo.almalinux.org/build_system/8/$basearch/
+      enabled = 0
+      gpgcheck = 0
+      name = Cloudlinux - 8 - SignNode
+    dest: /etc/yum.repos.d/signnode.repo
+  become: "yes"
+
+- name: Download codenotary.repo to /etc/yum.repos.d/
+  get_url:
+    url: https://packages.codenotary.org/codenotary.repo
+    dest: /etc/yum.repos.d/codenotary.repo
+  become: "yes"
+
+- name: Install epel repository
+  dnf:
+    name: "epel-release"
+    state: latest
+  become: "yes"
+
+- name: Install DNF packages
+  dnf:
+    name: "{{ sign_node_dnf_packages }}"
+    state: latest
+    enablerepo:
+      - powertools
+      - epel
+      - signnode
+      - codenotary-repo
+    update_cache: yes
+  become: "yes"
+...

@@ -1,0 +1,27 @@
+---
+cas_version: 1.0.2
+cas_architecture: amd64
+threads_count: 4
+base_work_dir: "/srv/alternatives"
+home_dir: "/home/{{ service_user }}"
+base_conf_dir: "{{ home_dir }}/.config"
+final_conf_dir: "{{ base_conf_dir }}/castor"
+build_node_working_directory: "{{ home_dir }}/albs"
+working_directories:
+  - "{{ base_work_dir }}"
+  - "{{ build_node_working_directory }}"
+  - "/var/cache/pbuilder/aptcache/"
+  - "/var/cache/pbuilder/pbuilder_envs/"
+  - "{{ base_work_dir }}/castor/build_node/pbuilder_envs/buster-amd64/aptcache"
+  - "{{ base_work_dir }}/castor/build_node/pbuilder_envs/bionic-amd64/aptcache"
+  - "{{ base_work_dir }}/castor/build_node/pbuilder_envs/focal-amd64/aptcache"
+  - "{{ base_work_dir }}/castor/build_node/pbuilder_envs/jessie-amd64/aptcache"
+  - "{{ base_work_dir }}/castor/build_node/pbuilder_envs/stretch-amd64/aptcache"
+  - "{{ base_work_dir }}/castor/build_node/pbuilder_envs/xenial-amd64/aptcache"
+  - "{{ base_work_dir }}/castor/build_node/pbuilder_envs/buster-arm64/aptcache"
+  - "{{ base_work_dir }}/castor/build_node/pbuilder_envs/buster-armhf/aptcache"
+  - "{{ base_work_dir }}/castor/build_node/pbuilder_envs/raspbian-armhf/aptcache"
+  - "{{ base_work_dir }}/castor/build_node"
+  - "{{ base_work_dir }}/castor/build_node/mock_configs"
+  - "{{ final_conf_dir }}"
+...

@@ -1,0 +1,36 @@
+---
+- name: Update system packages
+  dnf:
+    name: "*"
+    state: latest
+  register: update_state
+
+- name: Reboot a machine
+  reboot:
+    reboot_timeout: 180
+  when: update_state.changed
+
+- name: Install epel repository
+  dnf:
+    name: "epel-release"
+    state: latest
+
+- name: Install build system repository
+  yum_repository:
+    name: "buildnode"
+    file: "buildnode"
+    description: "Repository with dependencies for albs-node code"
+    baseurl: https://repo.almalinux.org/build_system/{{ os_version }}/$basearch/
+    enabled: no
+    gpgcheck: no
+
+- name: Install DNF packages
+  dnf:
+    name: "{{ build_node_dnf_packages }}"
+    state: latest
+    enablerepo:
+      - "epel"
+      - "buildnode"
+      - "powertools"
+    update_cache: yes
+...

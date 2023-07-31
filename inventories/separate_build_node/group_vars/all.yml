@@ -1,0 +1,33 @@
+---
+
+use_local_connection: "{{ use_local_connection }}"
+use_already_cloned_repos: "{{ use_already_cloned_repos }}"
+local_sources_root: "{{ local_sources_root }}"
+local_volumes_root: "{{ local_volumes_root }}"
+ansible_interpreter_path: "{{ ansible_interpreter_path }}"
+
+# playbook generates a key itself if the var is empty
+pgp_keys: "{{ pgp_keys }}"
+
+postgres_password: "{{ postgres_password }}"
+postgres_db: "{{ postgres_db }}"
+postgres_user: "{{ postgres_user }}"
+
+github_client: "{{ github_client }}"
+github_client_secret: "{{ github_client_secret }}"
+
+alts_jwt_token: "{{ alts_jwt_token }}"
+albs_jwt_token: "{{ albs_jwt_token }}"
+albs_jwt_secret: "{{ albs_jwt_secret }}"
+alts_jwt_secret: "{{ alts_jwt_secret }}"
+
+rabbitmq_erlang_cookie: "{{ rabbitmq_erlang_cookie }}"
+rabbitmq_user: "{{ rabbitmq_user }}"
+rabbitmq_pass: "{{ rabbitmq_pass }}"
+rabbitmq_vhost: "{{ rabbitmq_vhost }}"
+
+pulp_password: "{{ pulp_password }}"
+
+excluded_containers: ""
+
+...

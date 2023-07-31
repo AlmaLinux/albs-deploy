@@ -1,0 +1,12 @@
+---
+- name: Just deploy the systemd service of build node of ALBS
+  hosts: build_node_vm
+  tasks:
+    - include_role:
+        name: separate_build_node
+        tasks_from: install_systemd_service
+        apply:
+          tags:
+            - build_node_systemd_service
+  connection: "{{ 'local' if use_local_connection else 'ssh' }}"
+...

@@ -1,0 +1,9 @@
+server {
+  listen 80;
+  server_name pulp;
+
+  location / {
+      proxy_pass http://{{ albs_address }}:8081;
+      proxy_set_header Host $host;
+  }
+}

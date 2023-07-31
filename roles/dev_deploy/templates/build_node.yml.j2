@@ -1,0 +1,13 @@
+---
+development_mode: true
+master_url: "http://{{ container_name_prefix }}_web_server_1:8000/api/v1/"
+jwt_token: "{{ albs_jwt_token }}"
+pulp_host: "http://pulp"
+pulp_user: "{{ pulp_user }}"
+pulp_password: "{{ pulp_password }}"
+{% if cas_api_key is defined %}
+cas_api_key: {{ cas_api_key }}
+{% endif %}
+{% if cas_signer_id is defined %}
+cas_signer_id: {{ cas_signer_id }}
+{% endif %}

@@ -1,0 +1,31 @@
+---
+
+- name: General task
+  block:
+    - name: Ansible preparation
+      block:
+        - include_tasks: ansible_preparation.yml
+      tags:
+        - ansible
+
+    - name: Main tasks
+      block:
+        - name: Deploy tasks
+          block:
+            - import_tasks: common.yml
+            - import_tasks: gpg.yml
+              tags:
+                - configs
+            - import_tasks: configs.yml
+              tags:
+                - configs
+            - import_tasks: services.yml
+              tags:
+                - services
+            - import_tasks: misc.yml
+              tags:
+                - misc
+          tags:
+            - deploy
+      vars:
+        ansible_python_interpreter: "{{ ansible_interpreter_path }}"

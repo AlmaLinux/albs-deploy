@@ -1,0 +1,9 @@
+gpg_default_password: "1234567890"
+gpg_default_email: "test@albs.local"
+
+gpg_key_scenario:
+  name: gpg-key-scenario
+  dest: "~"
+  owner: "{{ ansible_user_id }}"
+  group: "{{ ansible_user_id }}"
+  mode: 0664

@@ -1,0 +1,127 @@
+---
+- name: Install packages
+  package:
+    state: present
+    name: "{{ packages }}"
+  become: "yes"
+
+- name: Check and install necessary pip packages
+  pip:
+    name: "{{ item }}"
+    state: present
+  loop:
+    - requests
+    - PyJWT
+  become: "yes"
+
+- name: Install NVM
+  shell: |
+    curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/{{ nvm_version }}/install.sh | bash
+  args:
+    creates: "{{ ansible_env.HOME }}/.nvm"
+
+- name: Check current Node.js version
+  shell: |
+    export NVM_DIR="$HOME/.nvm"
+    [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+    node -v || echo none
+  args:
+    executable: /bin/bash
+  register: node_check
+  ignore_errors: yes
+
+- name: Install Node.js version
+  shell: |
+    export NVM_DIR="$HOME/.nvm"
+    [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+    nvm install {{ node_version }}
+    nvm use {{ node_version }}
+  args:
+    executable: /bin/bash
+  when: node_version not in node_check.stdout
+
+- name: Switch to Node.js version
+  shell: |
+    export NVM_DIR="$HOME/.nvm"
+    [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+    nvm use {{ node_version }}
+  args:
+    executable: /bin/bash
+  when: node_version in node_check.stdout
+  ignore_errors: yes
+
+- name: Check Node.js version
+  shell: |
+    export NVM_DIR="$HOME/.nvm"
+    [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+    node -v
+  args:
+    executable: /bin/bash
+  register: result
+
+- debug: var=result.stdout_lines
+
+- name: Generate albs_jwt_token
+  shell: >
+    python3 -c "import jwt; import datetime; secret = '{{ albs_jwt_secret }}'; payload = {'sub': '1', 'aud': ['fastapi-users:auth'], 'exp': 1777628461}; token = jwt.encode(payload, secret, algorithm='HS256'); print(token)"
+  register: albs_jwt_result
+  when: albs_jwt_token is not defined or albs_jwt_token == ""
+
+- name: Set albs_jwt_token variable
+  set_fact:
+    albs_jwt_token: "{{ albs_jwt_result.stdout }}"
+  when: albs_jwt_token is not defined or albs_jwt_token == ""
+
+- name: Generate alts_jwt_token
+  shell: >
+    python3 -c "import jwt; import datetime; secret = '{{ alts_jwt_secret }}'; payload = {'email': 'base_user@almalinux.org'}; token = jwt.encode(payload, secret, algorithm='HS256'); print(token)"
+  register: alts_jwt_result
+  when: alts_jwt_token is not defined or alts_jwt_token == ""
+
+- name: Set alts_jwt_token variable
+  set_fact:
+    alts_jwt_token: "{{ alts_jwt_result.stdout }}"
+  when: alts_jwt_token is not defined or alts_jwt_token == ""
+
+- name: Clone ALBS sources
+  git:
+    repo: "{{ item.value }}"
+    dest: "{{ sources_root }}/{{ item.key }}"
+    clone: yes
+    update: yes
+    accept_hostkey: yes
+    force: yes
+    ssh_opts: "-o ForwardAgent=yes -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no"
+  with_dict: "{{ albs_repos }}"
+  when:
+    - not use_already_cloned_repos
+    - beholder_enabled or (item.key != "repo-beholder")
+
+- name: Sync ALBS sources to remote host
+  synchronize:
+    dest: "{{ sources_root }}"
+    src: "{{ local_sources_root }}"
+  when: use_already_cloned_repos and not use_local_connection
+
+- name: Sync ALBS volumes to remote host
+  synchronize:
+    dest: "{{ volumes_root }}"
+    src: "{{ local_volumes_root }}"
+  when: use_already_cloned_repos and not use_local_connection
+
+- name: Build NodeJS modules for albs-frontend
+  shell: |
+    export NVM_DIR="$HOME/.nvm"
+    [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+    cd {{ sources_root }}/albs-frontend
+    npm install
+  args:
+    executable: /bin/bash
+
+- name: Create services' folders
+  file:
+    name: "{{ item.path }}"
+    state: directory
+    mode: "{{ item.mode }}"
+    force: no
+  with_items: "{{ created_directories }}"

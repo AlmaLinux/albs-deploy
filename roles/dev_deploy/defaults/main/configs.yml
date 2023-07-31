@@ -1,0 +1,35 @@
+---
+generated_configs:
+  - name: "alts_config.yaml"
+    dest: "{{ sources_root }}/alts/configs"
+    mode: "0655"
+  - name: "albs.conf"
+    dest: "{{ sources_root }}/nginx_configs"
+    mode: "0655"
+  - name: "alembic.ini"
+    dest: "{{ sources_root }}/albs-web-server/alws"
+    mode: "0655"
+  - name: settings.py
+    dest: "{{ volumes_root }}/pulp/settings"
+    mode: "0655"
+  - name: albs-gitea-listener-config.yaml
+    dest: "{{ sources_root }}/albs-web-server/alws/scripts/albs-gitea-listener"
+    mode: "0655"
+  - name: build_node.yml
+    dest: "{{ sources_root }}/albs-node/node-config/castor"
+    mode: "0655"
+  - name: sign_node.yml
+    dest: "{{ sources_root }}/albs-sign-node/node-config"
+    mode: "0655"
+#  - name: mosquitto.conf
+#    dest: "{{ volumes_root }}/configs"
+#    mode: "0655"
+#  - name: beholder_cfg.yml
+#    dest: "{{ sources_root }}/repo-beholder"
+#    mode: "0655"
+#  - name: beholder_web.yml
+#    dest: "{{ sources_root }}/repo-beholder"
+#    mode: "0655"
+  - name: vars.env
+    dest: "{{ sources_root }}/albs-web-server"
+    mode: "0655"

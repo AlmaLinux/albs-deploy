@@ -1,0 +1,7 @@
+---
+roles:
+  - name: ezamriy.fail2ban
+    version: v0.1.0
+
+collections:
+  - name: community.docker

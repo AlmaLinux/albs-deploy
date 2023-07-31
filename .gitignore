@@ -1,0 +1,7 @@
+.idea
+.venv
+!inventory/template.yml
+!inventory/group_vars/all.yml.tmpl
+vars.yml
+roles/ezamriy.fail2ban
+

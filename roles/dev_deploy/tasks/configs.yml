@@ -1,0 +1,9 @@
+---
+
+- name: Generate a service's config
+  template:
+    dest: "{{ item.dest }}/{{ item.name }}"
+    src: "{{ item.name }}.j2"
+    mode: "{{ item.mode }}"
+    force: yes
+  with_items: "{{ generated_configs }}"

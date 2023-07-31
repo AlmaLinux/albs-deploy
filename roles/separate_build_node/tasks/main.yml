@@ -1,0 +1,8 @@
+---
+- name: Deploy build node on a separate machine
+  block:
+    - include_tasks: dnf.yml
+    - include_tasks: common.yml
+    - include_tasks: create_env.yml
+    - include_tasks: install_systemd_service.yml
+...

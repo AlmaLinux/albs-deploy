@@ -1,0 +1,123 @@
+---
+- name: Download CAS binary from Github
+  become: yes
+  get_url:
+    url: https://github.com/codenotary/cas/releases/download/v{{ cas_version }}/cas-v{{ cas_version }}-linux-{{ cas_architecture }}
+    dest: /usr/local/bin/cas
+    mode: 0755
+    owner: "root"
+    group: "root"
+
+- name: Create service user
+  user:
+    name: "{{ service_user }}"
+    groups: wheel
+    append: yes
+    state: present
+    create_home: yes
+    generate_ssh_key: yes
+  become: "yes"
+
+- name: Remove venv if exists
+  file:
+    path: "{{ sign_node_venv_directory }}"
+    state: absent
+  become: "yes"
+
+- name: Create subsequent directories
+  become_user: "{{ service_user }}"
+  become: "yes"
+  file:
+    path: "{{ item }}"
+    state: directory
+    recurse: yes
+    owner: "{{ service_user }}"
+    group: "{{ service_group }}"
+  with_items: "{{ working_directories }}"
+
+- name: Get already existing GPG key's fingerprint
+  become_user: "{{ service_user }}"
+  become: "yes"
+  shell: "gpg --list-keys test@albs.local | head -n 2 | tail -1"
+  register: gpg_key_fingerprint
+
+- name: Generate a GPG scenario
+  become_user: "{{ service_user }}"
+  become: "yes"
+  template:
+    dest: "{{ gpg_key_scenario.dest }}/{{ gpg_key_scenario.name }}"
+    src: "{{ gpg_key_scenario.name }}.j2"
+    owner: "{{ gpg_key_scenario.owner }}"
+    mode: "{{ gpg_key_scenario.mode }}"
+    force: yes
+
+- name: Generate GPG key
+  become_user: "{{ service_user }}"
+  become: "yes"
+  shell: "gpg --batch --gen-key {{ gpg_key_scenario.dest }}/{{ gpg_key_scenario.name }}"
+  when: gpg_key_fingerprint.stdout == ""
+
+- name: Get already existing GPG key's fingerprint
+  become_user: "{{ service_user }}"
+  become: "yes"
+  shell: "gpg --list-keys test@albs.local | head -n 2 | tail -1"
+  register: gpg_key_fingerprint
+
+- name: Set GPG key
+  set_fact:
+    gpg_keys:
+      - "{{ gpg_key_fingerprint.stdout[-16:] }}"
+
+- name: Generate sign node config
+  become_user: "{{ service_user }}"
+  become: "yes"
+  template:
+    src: sign_node.yml.j2
+    dest: "{{ final_conf_dir }}/sign_node.yml"
+    owner: "{{ service_user }}"
+    group: "{{ service_group }}"
+    mode: "0644"
+
+- name: Clone sign node repository
+  become_user: "{{ service_user }}"
+  become: "yes"
+  git:
+    repo: https://github.com/AlmaLinux/albs-sign-node.git
+    dest: "{{ sign_node_working_directory }}/albs-sign-node"
+    clone: yes
+    update: yes
+    accept_hostkey: yes
+    force: yes
+
+- name: Upgrade pip
+  become: yes
+  become_user: "{{ service_user }}"
+  pip:
+    name: pip
+    state: latest
+    virtualenv: "{{ sign_node_venv_directory }}"
+
+- name: Create venv
+  become: yes
+  become_user: "{{ service_user }}"
+  pip:
+    virtualenv: "{{ sign_node_venv_directory }}"
+    virtualenv_command: "python3 -m venv"
+    requirements: "{{ sign_node_requirements_path }}"
+    virtualenv_site_packages: true
+
+- name: Install pycurl in venv
+  become: yes
+  become_user: "{{ service_user }}"
+  pip:
+    name:
+      - pycurl
+      - rpm
+    virtualenv: "{{ sign_node_venv_directory }}"
+
+- name: Add pulp to /etc/hosts
+  ansible.builtin.lineinfile:
+    path: /etc/hosts
+    line: "{{ albs_address }} pulp"
+    state: present
+  become: yes

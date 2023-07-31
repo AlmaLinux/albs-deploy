@@ -1,0 +1,19 @@
+---
+- name: Create build node systemd service
+  template:
+    dest: "/etc/systemd/system/albs-sign-node.service"
+    src: "albs_sign_node.service.j2"
+    group: "root"
+    owner: "root"
+    mode: 0644
+  become: "yes"
+
+- name: Enable and start build node systemd service
+  systemd:
+    name: "albs-sign-node.service"
+    masked: no
+    state: restarted
+    daemon_reload: yes
+    enabled: yes
+  become: "yes"
+...
