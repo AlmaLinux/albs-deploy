@@ -1,6 +1,4 @@
 ---
-cas_version: 1.0.2
-cas_architecture: amd64
 threads_count: 4
 base_work_dir: "/srv/alternatives"
 home_dir: "/home/{{ service_user }}"

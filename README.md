@@ -18,8 +18,11 @@ You can deploy build system in a really fast way. Let's get started.
   ---
   github_client: <OAuth client id>
   github_client_secret: <OAuth token>
-  cas_api_key: <CAS signer token>
-  cas_signer_id: <CAS signer email>
+  immudb_username: <immudb username to be used>
+  immudb_password: <immudb password to be used>
+  immudb_database: <immudb database name to be used>
+  immudb_address: <url in format `host:port` of immudb instance, default port is 3322>
+  immudb_public_key_file: <path of the public key to use>
   frontend_baseurl: http://<Preferred hostname or IP address>:8080
   ```
   if you want deploy build system on remote machine add the following parameters.
@@ -87,11 +90,11 @@ Several tokens you can get on separate resources.
 7. Click `Register application`.
 8. On the next page, your `Client ID` and `Client Secret` will be visible. Note them down, but keep them secure.
 
-### CAS Tokens
+### Immudb Tokens
 
-1. Log in: Visit https://cas.codenotary.com/ and log in with your account.
-2. API Key: Navigate to your account or API settings. If an API key exists, note it down. If not, create one and record it securely. This is your cas_api_key.
-3. Signer ID: Your Signer ID is usually the email you used to create the account. So, your cas_signer_id is your account email.
+1. Username: Use the default username (`immudb`) or create your own user via [immudb-wrapper](https://github.com/AlmaLinux/immudb-wrapper) or [immuadmin](https://docs.immudb.io/master/connecting/clitools.html#immuadmin) tool
+2. Password: Use the default password (`immudb`) for the `immudb` user or use the password from your created user.
+3. Database: Use the default database (`defaultdb`) or create your own database via [immudb-wrapper](https://github.com/AlmaLinux/immudb-wrapper) or [immuadmin]
 
 ### JWT Tokens
 They are generated automatically, but if you want to make them static, it makes sense to generate them manually.

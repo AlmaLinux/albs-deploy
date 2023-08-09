@@ -1,13 +1,4 @@
 ---
-- name: Download CAS binary from Github
-  become: yes
-  get_url:
-    url: https://github.com/codenotary/cas/releases/download/v{{ cas_version }}/cas-v{{ cas_version }}-linux-{{ cas_architecture }}
-    dest: /usr/local/bin/cas
-    mode: 0755
-    owner: "root"
-    group: "root"
-
 - name: Create service user
   user:
     name: "{{ service_user }}"
