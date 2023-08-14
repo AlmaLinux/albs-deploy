@@ -8,9 +8,18 @@ development_mode: true
 dev_pgp_key_password: "{{ gpg_default_password }}"
 master_url: "http://{{ container_name_prefix }}_web_server_1:8000/api/v1/"
 ws_master_url: "ws://{{ container_name_prefix }}_web_server_1:8000/api/v1/"
-{% if cas_api_key is defined %}
-cas_api_key: {{ cas_api_key }}
+{% if immudb_username is defined %}
+immudb_username: {{ immudb_username }}
 {% endif %}
-{% if cas_signer_id is defined %}
-cas_signer_id: {{ cas_signer_id }}
+{% if immudb_password is defined %}
+immudb_password: {{ immudb_password }}
+{% endif %}
+{% if immudb_database is defined %}
+immudb_database: {{ immudb_database }}
+{% endif %}
+{% if immudb_address is defined %}
+immudb_address: {{ immudb_address }}
+{% endif %}
+{% if immudb_public_key_file is defined %}
+immudb_public_key_file: {{ immudb_public_key_file }}
 {% endif %}
