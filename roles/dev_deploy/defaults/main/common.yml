@@ -23,6 +23,12 @@ created_directories:
     mode: "0755"
   - path: "{{ sources_root }}/alts/configs"
     mode: "0755"
+  - path: "{{ volumes_root }}/immudb/data"
+    mode: "0777"
+  - path: "{{ volumes_root }}/immudb/config"
+    mode: "0777"
+  - path: "{{ volumes_root }}/immudb/logs"
+    mode: "0777"
 
 packages:
   - "gnupg"

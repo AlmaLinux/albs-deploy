@@ -1,7 +1,5 @@
 ---
 #threads_count: 4
-cas_version: 1.0.2
-cas_architecture: amd64
 base_work_dir: "/srv/alternatives"
 home_dir: "/home/{{ service_user }}"
 base_conf_dir: "{{ home_dir }}/.config"
