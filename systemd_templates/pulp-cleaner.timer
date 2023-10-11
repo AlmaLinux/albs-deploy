@@ -1,0 +1,9 @@
+[Unit]
+Requires=pulp-cleaner.service
+
+[Timer]
+Unit=pulp-cleaner.service
+OnCalendar=*-*-01
+
+[Install]
+WantedBy=timers.target
