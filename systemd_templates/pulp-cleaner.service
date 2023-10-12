@@ -1,0 +1,18 @@
+[Unit]
+Description=Cleans unneeded entities (such as completed tasks) from pulp
+Wants=pulp-cleaner.timer
+
+[Service]
+Type=oneshot
+User=root
+Environment="PULP_USERNAME=admin"
+Environment="PULP_PASSWORD=admin"
+Environment="PULP_HOST=http://pulp"
+Environment="CLEANER_CONCURRENCY_LIMIT=10"
+# Adjust the path to a python virtual environment
+# that includes aiohttp for the pulp-cleaner script
+# and the path to the pulp-cleaner script
+ExecStart=/bin/bash -c '/home/user/venv/bin/python3 pulp_cleaner.py'
+
+[Install]
+WantedBy=multi-user.target
