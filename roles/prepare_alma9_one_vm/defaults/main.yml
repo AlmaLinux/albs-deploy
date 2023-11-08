@@ -1,0 +1,20 @@
+required_rpm:
+  - python3
+  - python3-pip
+  - docker-ce
+  - docker-ce-cli
+  - containerd.io
+  - docker-buildx-plugin
+  - docker-compose-plugin
+
+required_pip:
+  - PyJWT==2.7.0
+  - requests==2.25.1
+
+system_account_name: albs
+
+system_account_groups:
+  - wheel
+  - docker
+
+immudb_key_path: /var/immudb_keys

@@ -1,0 +1,14 @@
+# Preparing Almalinux9 node for ALBS all-on-one installation:
+#  - Install Docker with docker-compose
+#  - Install Python with required packages
+#  - Install Ansible with required collections
+#  - Create albs service account with correct permissions
+#  - Generate RSA key pair for Immudb
+---
+- name: Deploy the ALBS
+  hosts: albs_on_one_vm
+  gather_facts: false
+  roles:
+    - prepare_alma9_one_vm
+  connection: "{{ 'local' if use_local_connection else 'ssh' }}"
+

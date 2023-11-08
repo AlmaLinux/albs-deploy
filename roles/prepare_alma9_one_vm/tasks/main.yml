@@ -1,0 +1,52 @@
+- name: Add Docker CE repo
+  become: true
+  ansible.builtin.yum_repository:
+    name: docker-ce
+    description: Docker CE Stable - $basearch
+    baseurl: https://download.docker.com/linux/centos/$releasever/$basearch/stable
+    enabled: false
+    repo_gpgcheck: true
+    gpgkey: https://download.docker.com/linux/centos/gpg
+    sslverify: true
+    sslcacert: /etc/pki/tls/certs/ca-bundle.crt
+
+- name: Install required RPM packages
+  become: true
+  ansible.builtin.dnf:
+    name: "{{ required_rpm }}"
+    state: present
+    enablerepo: docker-ce
+
+- name: Install required pip packages
+  become: true
+  ansible.builtin.pip:
+    name: "{{ required_pip }}"
+
+- name: Start and enable Docker engine
+  ansible.builtin.systemd:
+    name: docker
+    enabled: true
+    daemon_reload: true
+    state: started
+
+- name: Create system account
+  ansible.builtin.user:
+    name: "{{ system_account_name }}"
+    groups: "{{ system_account_groups }}"
+
+- name: Allow NOPASSWD sudo for system account
+  community.general.sudoers:
+    name: "{{ system_account_name }}-ALL-NOPASSWD"
+    user: "{{ system_account_name }}"
+    state: present
+    commands: ALL
+
+- name: Create directory for Immudb keys
+  ansible.builtin.file:
+    path: "{{ immudb_key_path }}"
+    state: directory
+    mode: '0770'
+
+- name: Generate keys for Immudb
+  community.crypto.openssh_keypair:
+    path: "{{ immudb_key_path }}/immudb"
