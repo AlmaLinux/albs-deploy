@@ -16,6 +16,7 @@
             - import_tasks: gpg.yml
               tags:
                 - configs
+                - gpg
             - import_tasks: configs.yml
               tags:
                 - configs

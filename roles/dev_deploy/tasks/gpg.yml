@@ -21,7 +21,15 @@
   shell: "gpg --list-keys test@albs.local | head -n 2 | tail -1"
   register: gpg_key_fingerprint
 
+- name: Allow access to .gnupg directory to sign_node container
+  ansible.builtin.file:
+    path: "{{ gnupg_dir_path }}"
+    owner: "{{ alt_uid }}"
+    group: "{{ alt_uid }}"
+    recurse: true
+
 - name: Set GPG key
   set_fact:
     gpg_keys:
       - "{{ gpg_key_fingerprint.stdout[-16:] }}"
+
