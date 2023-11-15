@@ -22,6 +22,7 @@
   register: gpg_key_fingerprint
 
 - name: Allow access to .gnupg directory to sign_node container
+  become: true
   ansible.builtin.file:
     path: "{{ gnupg_dir_path }}"
     owner: "{{ alt_uid }}"
