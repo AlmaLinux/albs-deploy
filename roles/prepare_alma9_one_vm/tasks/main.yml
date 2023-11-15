@@ -1,5 +1,4 @@
 - name: Add Docker CE repo
-  become: true
   ansible.builtin.yum_repository:
     name: docker-ce
     description: Docker CE Stable - $basearch
@@ -11,19 +10,16 @@
     sslcacert: /etc/pki/tls/certs/ca-bundle.crt
 
 - name: Install required RPM packages
-  become: true
   ansible.builtin.dnf:
     name: "{{ required_rpm }}"
     state: present
     enablerepo: docker-ce
 
 - name: Install required pip packages
-  become: true
   ansible.builtin.pip:
     name: "{{ required_pip }}"
 
 - name: Start and enable Docker engine
-  become: true
   ansible.builtin.systemd:
     name: docker
     enabled: true
@@ -41,20 +37,3 @@
     user: "{{ system_account_name }}"
     state: present
     commands: ALL
-
-- name: Create directory for Immudb keys
-  ansible.builtin.file:
-    path: "{{ immudb_key_path }}"
-    state: directory
-    mode: "0770"
-
-- name: Generate keys for Immudb
-  community.crypto.openssh_keypair:
-    path: "{{ immudb_key_path }}/immudb"
-
-- name: Setting owner for Immudb keys directory
-  ansible.builtin.file:
-    path: "{{ immudb_key_path }}"
-    owner: "{{ system_account_name }}"
-    group: "{{ system_account_name }}"
-    recurse: true
