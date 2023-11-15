@@ -8,6 +8,7 @@
 - name: Deploy the ALBS
   hosts: albs_on_one_vm
   gather_facts: false
+  become: true
   roles:
     - prepare_alma9_one_vm
   connection: "{{ 'local' if use_local_connection else 'ssh' }}"

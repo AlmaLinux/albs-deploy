@@ -23,6 +23,7 @@
     name: "{{ required_pip }}"
 
 - name: Start and enable Docker engine
+  become: true
   ansible.builtin.systemd:
     name: docker
     enabled: true
@@ -45,8 +46,15 @@
   ansible.builtin.file:
     path: "{{ immudb_key_path }}"
     state: directory
-    mode: '0770'
+    mode: "0770"
 
 - name: Generate keys for Immudb
   community.crypto.openssh_keypair:
     path: "{{ immudb_key_path }}/immudb"
+
+- name: Setting owner for Immudb keys directory
+  ansible.builtin.file:
+    path: "{{ immudb_key_path }}"
+    owner: "{{ system_account_name }}"
+    group: "{{ system_account_name }}"
+    recurse: true
