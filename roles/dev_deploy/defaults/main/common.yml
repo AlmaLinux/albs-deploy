@@ -29,6 +29,8 @@ created_directories:
     mode: "0777"
   - path: "{{ volumes_root }}/immudb/logs"
     mode: "0777"
+  - path: "{{ sources_root }}/node_modules"
+    mode: "0755"
 
 packages:
   - "gnupg"
