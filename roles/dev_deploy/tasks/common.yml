@@ -118,7 +118,7 @@
   args:
     executable: /bin/bash
 
-- name: Create services' folders
+- name: Create services folders
   file:
     name: "{{ item.path }}"
     state: directory
