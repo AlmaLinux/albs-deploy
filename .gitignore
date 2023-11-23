@@ -4,4 +4,4 @@
 !inventory/group_vars/all.yml.tmpl
 vars.yml
 roles/ezamriy.fail2ban
-
+.vscode/*
