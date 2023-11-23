@@ -7,3 +7,6 @@ gpg_key_scenario:
   owner: "{{ ansible_user_id }}"
   group: "{{ ansible_user_id }}"
   mode: 0664
+
+alt_uid: 1000
+gnupg_dir_path: '~/.gnupg'
