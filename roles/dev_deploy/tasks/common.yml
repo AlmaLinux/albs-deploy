@@ -84,6 +84,7 @@
   when: alts_jwt_token is not defined or alts_jwt_token == ""
 
 - name: Clone ALBS sources
+  tags: clone-albs-sources
   git:
     repo: "{{ item.value }}"
     dest: "{{ sources_root }}/{{ item.key }}"
