@@ -5,3 +5,4 @@ albs_repos:
   albs-sign-node: git@github.com:AlmaLinux/albs-sign-node.git
   repo-beholder: git@github.com:AlmaLinux/repo-beholder.git
   alts: git@github.com:AlmaLinux/alts.git
+  albs-sign-file: git@github.com:AlmaLinux/albs-sign-file.git
