@@ -1,4 +1,5 @@
 ---
+
 - name: Update system packages
   dnf:
     name: "*"
@@ -31,6 +32,6 @@
     enablerepo:
       - "epel"
       - "buildnode"
-      - "powertools"
+      - "{{ powertools_repository_name }}"
     update_cache: yes
 ...

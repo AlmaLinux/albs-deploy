@@ -3,7 +3,7 @@
 - name: Create service user
   user:
     name: "{{ service_user }}"
-    groups: wheel
+    groups: wheel, mock
     append: yes
     state: present
     create_home: yes

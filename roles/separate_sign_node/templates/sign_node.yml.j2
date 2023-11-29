@@ -8,18 +8,15 @@ development_mode: true
 dev_pgp_key_password: "{{ gpg_default_password }}"
 master_url: "http://{{ albs_address }}:8080/api/v1/"
 ws_master_url: "ws://{{ albs_address }}:8080/api/v1/"
-{% if immudb_username is defined %}
-immudb_username: {{ immudb_username }}
+{% if immudb_address is defined and immudb_address %}
+immudb_address: "{{ immudb_address }}"
 {% endif %}
-{% if immudb_password is defined %}
-immudb_password: {{ immudb_password }}
+{% if immudb_database is defined and immudb_database %}
+immudb_database: "{{ immudb_database }}"
 {% endif %}
-{% if immudb_database is defined %}
-immudb_database: {{ immudb_database }}
+{% if immudb_username is defined and immudb_username %}
+immudb_username: "{{ immudb_username }}"
 {% endif %}
-{% if immudb_address is defined %}
-immudb_address: {{ immudb_address }}
-{% endif %}
-{% if immudb_public_key_file is defined %}
-immudb_public_key_file: {{ immudb_public_key_file }}
+{% if immudb_password is defined and immudb_password %}
+immudb_password: "{{ immudb_password }}"
 {% endif %}
