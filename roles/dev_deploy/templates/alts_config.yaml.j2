@@ -5,7 +5,6 @@ ssl_config:
   security_certificate: ""
   broker_ca_certificates: ""
 broker_config:
-  use_ssl: false
   rabbitmq_host: "rabbitmq-ts"
   rabbitmq_port: 5672
   rabbitmq_ssl_port: 5671
@@ -13,17 +12,8 @@ broker_config:
   rabbitmq_password: "{{ rabbitmq_pass }}"
   rabbitmq_vhost: "{{ rabbitmq_vhost }}"
 results_backend_config:
-  s3_access_key_id:
-  s3_secret_access_key:
-  s3_bucket:
-  s3_base_path: 'celery_result_backend/'
-  s3_region:
-  s3_endpoint_url:
-  azureblockblob_container_name: ""
-  azureblockblob_base_path: ""
-  # deprecated
-  azure_connection_string: "blockblob://"
-result_backend: "{{ result_backend }}"
+  redis_host: "{{ container_name_prefix }}_redis_1"
+  redis_db_number: 1
 task_default_queue: "default"
 task_acks_late: true
 task_track_started: true
@@ -36,5 +26,3 @@ logs_uploader_config:
   pulp_host: "http://{{ container_name_prefix }}_pulp_1"
   pulp_user: "{{ pulp_user }}"
   pulp_password: "{{ pulp_password }}"
-  # deprecated
-  azure_logs_container: "testsys-mqdata"
