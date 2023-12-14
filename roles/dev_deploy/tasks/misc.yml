@@ -56,32 +56,32 @@
     command: "bash -c 'source env/bin/activate && chmod +x scripts/manage_users.py && python3 scripts/manage_users.py -e base_user@almalinux.org -t AlmaLinux_team --verify --superuser || true'"
   when: is_clean_installation.stat.exists == False
 
-- name: Checking if PGP key exists on web_server
+- name: Checking if GPG key exists on web_server
   tags: add_pgp_to_web_server
   ansible.builtin.uri:
-    url: http://localhost:8088/api/v1/sign-keys/
+    url: "{{ albs_api_url_ext }}sign-keys/"
     method: GET
     headers: 
       accept: application/json
-      Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxIiwiYXVkIjpbImZhc3RhcGktdXNlcnM6YXV0aCJdLCJleHAiOjE3Nzc2Mjg0NjF9.epY7PC6dCmzNAmJ_H73GLb23wbBWJhjqOas39Q5dHDk
+      Authorization: "Bearer {{ albs_jwt_token }}"
     return_content: true
   register: gpg_request_output
 
 - name: Adding GPG key to the web_server
   tags: add_pgp_to_web_server
   ansible.builtin.uri:
-    url: http://lab3:8088/api/v1/sign-keys/new/
+    url: "{{ albs_api_url_ext }}sign-keys/new/"
     method: POST
     headers:
       accept: application/json
-      Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxIiwiYXVkIjpbImZhc3RhcGktdXNlcnM6YXV0aCJdLCJleHAiOjE3Nzc2Mjg0NjF9.epY7PC6dCmzNAmJ_H73GLb23wbBWJhjqOas39Q5dHDk
+      Authorization: "Bearer {{ albs_jwt_token }}"
       Content-Type: application/json
     body:
-      name: test
+      name: Test GPG key
       description: test
-      keyid: A3CF0F0D715BF4F5
-      fingerprint: A6ADA40E72F6C56ABDF1EA55A3CF0F0D715BF4F5
-      public_url: string
+      keyid: "{{ gpg_key_fingerprint.stdout[-16:] }}"
+      fingerprint: "{{ gpg_key_fingerprint.stdout | trim }}"
+      public_url: http://test.com
       platform_id: 1
     body_format: json
     status_code:
