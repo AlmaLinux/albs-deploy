@@ -13,6 +13,8 @@
         - name: Deploy tasks
           block:
             - import_tasks: common.yml
+              tags:
+                - common
             - import_tasks: gpg.yml
               tags:
                 - configs

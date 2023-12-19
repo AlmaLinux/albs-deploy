@@ -2,7 +2,6 @@ sources_root: "{{ local_sources_root if use_already_cloned_repos and use_local_c
 volumes_root: "{{ local_volumes_root if use_already_cloned_repos and use_local_connection else '~/albs/volumes' }}"
 folder_name_for_result_backend: "/mnt"
 result_backend: "{{ 'file:///' + folder_name_for_result_backend }}"
-pulp_user: "admin"
 
 created_directories:
   - path: "{{ sources_root }}"

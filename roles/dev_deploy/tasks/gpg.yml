@@ -1,7 +1,7 @@
 ---
 
 - name: Get already existing GPG key's fingerprint
-  shell: "gpg --list-keys test@albs.local | head -n 2 | tail -1"
+  shell: "gpg --list-keys {{ gpg_default_email }} | head -n 2 | tail -1"
   register: gpg_key_fingerprint
 
 - name: Generate a GPG scenario
@@ -18,7 +18,7 @@
   when: gpg_key_fingerprint.stdout == ""
 
 - name: Get already existing GPG key's fingerprint
-  shell: "gpg --list-keys test@albs.local | head -n 2 | tail -1"
+  shell: "gpg --list-keys {{ gpg_default_email }} | head -n 2 | tail -1"
   register: gpg_key_fingerprint
 
 - name: Allow access to .gnupg directory to sign_node container
