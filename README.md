@@ -155,3 +155,11 @@ rabbitmq_vhost:
 
 pulp_password:
 ```
+
+## Contributing to albs-deploy
+Any question? Found a bug? File an [issue](https://github.com/AlmaLinux/build-system/issues).
+Do you want to contribute with source code?
+1. Fork the repository on GitHub
+2. Create a new feature branch
+3. Write your change
+4. Submit a pull request
