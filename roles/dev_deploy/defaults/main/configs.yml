@@ -33,3 +33,6 @@ generated_configs:
   - name: vars.env
     dest: "{{ sources_root }}/albs-web-server"
     mode: "0655"
+  - name: tests_cacher.yml
+    dest: "{{ sources_root }}/alma-tests-cacher"
+    mode: "0644"
