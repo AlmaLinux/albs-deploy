@@ -10,25 +10,37 @@ ansible_interpreter_path: auto
 # playbook generates a key itself if the var is empty
 pgp_keys: []
 
+postgres_host: "db"
 postgres_password: "password"
 postgres_db: "db"
 postgres_user: "postgres"
 
-# github_client: ""
-# github_client_secret: ""
+albs_api_url: "http://web_server:8000/api/v1/"
+albs_api_url_ext: "http://{{ albs_address }}:8088/api/v1/"
+albs_db_url: "postgresql+asyncpg://{{ postgres_user }}:{{ postgres_password }}@{{ postgres_host }}/{{ postgres_db }}"
+albs_db_sync_url: "postgresql+psycopg2://{{ postgres_user }}:{{ postgres_password }}@{{ postgres_host }}/{{ postgres_db }}"
+albs_test_db_url: "postgresql+asyncpg://{{ postgres_user }}:{{ postgres_password }}@{{ postgres_host }}/{{ postgres_db }}"
+sign_server_api_url: "http://nginx/sign-file/"
+sign_server_username: "test@test.ru"
+sign_server_password: "test"
+
 
 alts_jwt_token: ""
 albs_jwt_token: ""
 albs_jwt_secret: "secret"
+
 alts_jwt_secret: "alts-secret"
+alts_host: "http://alts-scheduler:8000"
 
 rabbitmq_erlang_cookie: "rabbitmq"
 rabbitmq_user: "admin"
 rabbitmq_pass: "password"
 rabbitmq_vhost: "rabbitmq"
 
+pulp_host: "http://pulp"
 pulp_password: "password"
 pulp_user: "admin"
+pulp_database_url: "postgresql+psycopg2://postgres:{{ pulp_password }}@pulp/pulp"
 
 # cas_api_key: ""
 # cas_signer_id: ""

@@ -56,6 +56,39 @@
     command: "bash -c 'source env/bin/activate && chmod +x scripts/manage_users.py && python3 scripts/manage_users.py -e base_user@almalinux.org -t AlmaLinux_team --verify --superuser || true'"
   when: is_clean_installation.stat.exists == False
 
+- name: Checking if GPG key exists on web_server
+  tags: add_pgp_to_web_server
+  ansible.builtin.uri:
+    url: "{{ albs_api_url_ext }}sign-keys/"
+    method: GET
+    headers: 
+      accept: application/json
+      Authorization: "Bearer {{ albs_jwt_token }}"
+    return_content: true
+  register: gpg_request_output
+
+- name: Adding GPG key to the web_server
+  tags: add_pgp_to_web_server
+  ansible.builtin.uri:
+    url: "{{ albs_api_url_ext }}sign-keys/new/"
+    method: POST
+    headers:
+      accept: application/json
+      Authorization: "Bearer {{ albs_jwt_token }}"
+      Content-Type: application/json
+    body:
+      name: Test GPG key
+      description: test
+      keyid: "{{ gpg_key_fingerprint.stdout[-16:] }}"
+      fingerprint: "{{ gpg_key_fingerprint.stdout | trim }}"
+      public_url: http://test.com
+      platform_id: 1
+    body_format: json
+    status_code:
+      - 200 
+      - 201
+  when: gpg_request_output.json|length == 0 
+
 - name: Bootstrap repositories
   community.docker.docker_container_exec:
     container: "{{ container_name_prefix }}_web_server_1"
