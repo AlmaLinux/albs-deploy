@@ -62,28 +62,41 @@
 - debug: var=result.stdout_lines
 
 - name: Generate albs_jwt_token
+  tags: 
+    - jwt_tokens
+    - albs_jwt_token
   shell: >
     python3 -c "import jwt; import datetime; secret = '{{ albs_jwt_secret }}'; payload = {'sub': '1', 'aud': ['fastapi-users:auth'], 'exp': 1777628461}; token = jwt.encode(payload, secret, algorithm='HS256'); print(token)"
   register: albs_jwt_result
   when: albs_jwt_token is not defined or albs_jwt_token == ""
 
 - name: Set albs_jwt_token variable
+  tags:
+    - jwt_tokens
+    - albs_jwt_token
   set_fact:
     albs_jwt_token: "{{ albs_jwt_result.stdout }}"
   when: albs_jwt_token is not defined or albs_jwt_token == ""
 
 - name: Generate alts_jwt_token
+  tags:
+    - jwt_tokens
+    - alts_jwt_token
   shell: >
     python3 -c "import jwt; import datetime; secret = '{{ alts_jwt_secret }}'; payload = {'email': 'base_user@almalinux.org'}; token = jwt.encode(payload, secret, algorithm='HS256'); print(token)"
   register: alts_jwt_result
   when: alts_jwt_token is not defined or alts_jwt_token == ""
 
 - name: Set alts_jwt_token variable
+  tags:
+    - jwt_tokens
+    - alts_jwt_token
   set_fact:
     alts_jwt_token: "{{ alts_jwt_result.stdout }}"
   when: alts_jwt_token is not defined or alts_jwt_token == ""
 
 - name: Clone ALBS sources
+  tags: clone-albs-sources
   git:
     repo: "{{ item.value }}"
     dest: "{{ sources_root }}/{{ item.key }}"
