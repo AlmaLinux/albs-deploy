@@ -6,4 +6,4 @@ gpg_key_scenario:
   dest: "{{ home_dir }}"
   owner: "{{ service_user }}"
   group: "{{ service_group }}"
-  mode: 0664
+  mode: "0664"

@@ -4,7 +4,7 @@
   ansible.builtin.template:
     src: pulp.conf.j2
     dest: /etc/nginx/conf.d/pulp.conf
-    mode: '0644'
+    mode: "0644"
   register: nginx_conf
   become: "yes"
 
