@@ -5,7 +5,7 @@
     src: "albs_sign_node.service.j2"
     group: "root"
     owner: "root"
-    mode: 0644
+    mode: "0644"
   become: "yes"
 
 - name: Enable and start build node systemd service
