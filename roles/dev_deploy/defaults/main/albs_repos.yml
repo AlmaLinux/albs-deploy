@@ -1,10 +1,9 @@
 albs_repos:
-  albs-frontend: git@github.com:AlmaLinux/albs-frontend.git
-  albs-node: git@github.com:AlmaLinux/albs-node.git
-  albs-web-server: git@github.com:AlmaLinux/albs-web-server.git
-  albs-sign-node: git@github.com:AlmaLinux/albs-sign-node.git
-  alma-tests-cacher: git@github.com:AlmaLinux/alma-tests-cacher.git
-  repo-beholder: git@github.com:AlmaLinux/repo-beholder.git
-  alts: git@github.com:AlmaLinux/alts.git
-  albs-sign-file: git@github.com:AlmaLinux/albs-sign-file.git
-  alma-tests-cacher: https://github.com/AlmaLinux/alma-tests-cacher
+  albs-frontend: https://github.com/AlmaLinux/albs-frontend.git
+  albs-node: https://github.com/AlmaLinux/albs-node.git
+  albs-web-server: https://github.com/AlmaLinux/albs-web-server.git
+  albs-sign-node: https://github.com/AlmaLinux/albs-sign-node.git
+  alma-tests-cacher: https://github.com/AlmaLinux/alma-tests-cacher.git
+  repo-beholder: https://github.com/AlmaLinux/repo-beholder.git
+  alts: https://github.com/AlmaLinux/alts.git
+  albs-sign-file: https://github.com/AlmaLinux/albs-sign-file.git
