@@ -50,6 +50,16 @@
     command: "bash -c 'source env/bin/activate && chmod +x scripts/bootstrap_permissions.py && python3 scripts/bootstrap_permissions.py || true'"
   when: is_clean_installation.stat.exists == False
 
+- name: Bootstrap repositories
+  community.docker.docker_container_exec:
+    container: "{{ container_name_prefix }}_web_server_1"
+    command: "bash -c 'source env/bin/activate && chmod +x scripts/bootstrap_repositories.py && python3 scripts/bootstrap_repositories.py -c reference_data/platforms.yaml'"
+  register: result
+  until: result is succeeded
+  retries: 10
+  delay: 15
+  when: is_clean_installation.stat.exists == False
+
 - name: Activate user
   community.docker.docker_container_exec:
     container: "{{ container_name_prefix }}_web_server_1"
@@ -61,7 +71,7 @@
   ansible.builtin.uri:
     url: "{{ albs_api_url_ext }}sign-keys/"
     method: GET
-    headers: 
+    headers:
       accept: application/json
       Authorization: "Bearer {{ albs_jwt_token }}"
     return_content: true
@@ -85,19 +95,9 @@
       platform_id: 1
     body_format: json
     status_code:
-      - 200 
+      - 200
       - 201
-  when: gpg_request_output.json|length == 0 
-
-- name: Bootstrap repositories
-  community.docker.docker_container_exec:
-    container: "{{ container_name_prefix }}_web_server_1"
-    command: "bash -c 'source env/bin/activate && chmod +x scripts/bootstrap_repositories.py && python3 scripts/bootstrap_repositories.py -c reference_data/platforms.yaml'"
-  register: result
-  until: result is succeeded
-  retries: 3
-  delay: 60
-  when: is_clean_installation.stat.exists == False
+  when: gpg_request_output.json|length == 0
 
 - name: Bootstrap flavours
   community.docker.docker_container_exec:
