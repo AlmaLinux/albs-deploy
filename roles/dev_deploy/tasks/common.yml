@@ -110,6 +110,18 @@
     - not use_already_cloned_repos
     - beholder_enabled or (item.key != "repo-beholder")
 
+- name: Update ALBS sources pushurl
+  tags: update-albs-sources-pushurl
+  git_config:
+    repo: "{{sources_root}}/{{ item.key }}"
+    name: remote.origin.pushurl
+    value: "git@github.com:AlmaLinux/{{ item.key }}.git"
+    scope: local
+  with_dict: "{{ albs_repos }}"
+  when:
+    - not use_already_cloned_repos
+    - beholder_enabled or (item.key != "repo-beholder")
+
 - name: Sync ALBS sources to remote host
   synchronize:
     dest: "{{ sources_root }}"
