@@ -73,7 +73,7 @@
     method: GET
     headers:
       accept: application/json
-      Authorization: "Bearer {{ albs_jwt_token }}"
+      Authorization: "Bearer {{ albs_jwt }}"
     return_content: true
   register: gpg_request_output
 
@@ -84,7 +84,7 @@
     method: POST
     headers:
       accept: application/json
-      Authorization: "Bearer {{ albs_jwt_token }}"
+      Authorization: "Bearer {{ albs_jwt }}"
       Content-Type: application/json
     body:
       name: Test GPG key
