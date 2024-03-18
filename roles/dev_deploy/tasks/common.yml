@@ -67,13 +67,15 @@
     - albs_jwt_token
   block:
     - name: Generate ALBS JWT
-      shell: >
-        python3 -c "import jwt; secret = '{{ albs_jwt_secret }}'; payload = {'sub': '1', 'aud': ['fastapi-users:auth'], 'exp': 1777628461}; token = jwt.encode(payload, secret, algorithm='HS256'); print(token)"
-      register: albs_jwt_result
+      jwt_generator:
+        target: albs
+        secret: "{{ albs_jwt_secret }}"
+        user_id: 1
+      register: albs_jwt
     - name: Set albs_jwt fact
       set_fact:
-        albs_jwt: "{{ albs_jwt_result.stdout }}"
-      when: albs_jwt_result is defined
+        albs_jwt: "{{ albs_jwt.token }}"
+      when: albs_jwt is defined
   when: not albs_jwt_token
 
 - name: Set albs_jwt when is set via vars.yml
@@ -81,14 +83,15 @@
     albs_jwt: "{{ albs_jwt_token }}"
   when: albs_jwt_token
 
-# TODO: Evaluate whether we need to do the same as with albs_jwt_token
-- name: Generate alts_jwt_token
+- name: Generate ALTS JWT token
   tags:
     - jwt_tokens
     - alts_jwt_token
-  shell: >
-    python3 -c "import jwt; secret = '{{ alts_jwt_secret }}'; payload = {'email': 'base_user@almalinux.org'}; token = jwt.encode(payload, secret, algorithm='HS256'); print(token)"
-  register: alts_jwt_result
+  jwt_generator:
+    target: alts
+    secret: "{{ alts_jwt_secret }}"
+    email: base_user@almalinux.org
+  register: alts_jwt
   when: alts_jwt_token is not defined or alts_jwt_token == ""
 
 - name: Set alts_jwt_token variable
@@ -96,7 +99,7 @@
     - jwt_tokens
     - alts_jwt_token
   set_fact:
-    alts_jwt_token: "{{ alts_jwt_result.stdout }}"
+    alts_jwt_token: "{{ alts_jwt.token }}"
   when: alts_jwt_token is not defined or alts_jwt_token == ""
 
 - name: Clone ALBS sources
