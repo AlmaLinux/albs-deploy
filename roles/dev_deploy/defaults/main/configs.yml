@@ -3,49 +3,49 @@ generated_configs:
   - sname: alts_config.yaml.j2
     dname: alts_config.yaml
     dest: "{{ sources_root }}/alts/configs"
-    mode: "0655"
+    mode: "0644"
   - sname: albs.conf.j2
     dname: albs.conf
     dest: "{{ sources_root }}/nginx_configs"
-    mode: "0655"
+    mode: "0644"
   - sname: alembic.ini.j2
     dname: alembic.ini
     dest: "{{ sources_root }}/albs-web-server/alws"
-    mode: "0655"
+    mode: "0644"
   - sname: settings.py.j2
     dname: settings.py
     dest: "{{ volumes_root }}/pulp/settings"
-    mode: "0655"
+    mode: "0644"
   - sname: albs-gitea-listener-config.yaml.j2
     dname: albs-gitea-listener-config.yaml
     dest: "{{ sources_root }}/albs-web-server/alws/scripts/albs-gitea-listener"
-    mode: "0655"
+    mode: "0644"
   - sname: build_node.yml.j2
     dname: build_node.yml
     dest: "{{ sources_root }}/albs-node/node-config/castor"
-    mode: "0655"
+    mode: "0644"
   - sname: sign_node.yml.j2
     dname: sign_node.yml
     dest: "{{ sources_root }}/albs-sign-node/node-config"
-    mode: "0655"
+    mode: "0644"
 #  - name: mosquitto.conf
 #    dest: "{{ volumes_root }}/configs"
-#    mode: "0655"
+#    mode: "0644"
 #  - name: beholder_cfg.yml
 #    dest: "{{ sources_root }}/repo-beholder"
-#    mode: "0655"
+#    mode: "0644"
 #  - name: beholder_web.yml
 #    dest: "{{ sources_root }}/repo-beholder"
-#    mode: "0655"
+#    mode: "0644"
   - sname: vars.env.j2
     dname: vars.env
     dest: "{{ sources_root }}/albs-web-server"
-    mode: "0655"
+    mode: "0644"
   - sname: albs-sign-file.env.j2
     dname: .env
     dest: "{{ sources_root }}/albs-sign-file/"
-    mode: "0655"
+    mode: "0644"
   - sname: alma-tests-cacher-vars.yaml.j2
     dname: vars.yaml
     dest: "{{ sources_root}}/alma-tests-cacher"
-    mode: "0655"
+    mode: "0644"
