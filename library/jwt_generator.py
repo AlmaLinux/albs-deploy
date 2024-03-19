@@ -42,13 +42,13 @@ author:
 
 _EXAMPLES = """
 - name: Create token for ALBS
-  jwt:
+  jwt_generator:
     target: albs
     secret: secret
     user_id: 1
 
 - name: Create token for ALTS
-  jwt:
+  jwt_generator:
     target: alts
     secret: secret
     email: user@almalinux.org

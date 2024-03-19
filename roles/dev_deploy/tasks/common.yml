@@ -10,7 +10,6 @@
     name: "{{ item }}"
     state: present
   loop:
-    - requests
     - PyJWT
   become: "yes"
 
@@ -62,7 +61,7 @@
 - debug: var=result.stdout_lines
 
 - name: Set albs_jwt when is not set via vars.yml
-  tags: 
+  tags:
     - jwt_tokens
     - albs_jwt_token
   block:
@@ -71,36 +70,45 @@
         target: albs
         secret: "{{ albs_jwt_secret }}"
         user_id: 1
-      register: albs_jwt
+      register: generated_albs_jwt
     - name: Set albs_jwt fact
       set_fact:
-        albs_jwt: "{{ albs_jwt.token }}"
-      when: albs_jwt is defined
+        albs_jwt: "{{ generated_albs_jwt.token }}"
+      when: generated_albs_jwt is defined
   when: not albs_jwt_token
 
 - name: Set albs_jwt when is set via vars.yml
+  tags:
+    - jwt_tokens
+    - albs_jwt_token
   set_fact:
     albs_jwt: "{{ albs_jwt_token }}"
   when: albs_jwt_token
 
-- name: Generate ALTS JWT token
+- name: Set alts_jwt when is not set via vars.yml
   tags:
     - jwt_tokens
     - alts_jwt_token
-  jwt_generator:
-    target: alts
-    secret: "{{ alts_jwt_secret }}"
-    email: base_user@almalinux.org
-  register: alts_jwt
-  when: alts_jwt_token is not defined or alts_jwt_token == ""
+  block:
+    - name: Generate ALTS JWT
+      jwt_generator:
+        target: alts
+        secret: "{{ alts_jwt_secret }}"
+        email: base_user@almalinux.org
+      register: generated_alts_jwt
+    - name: Set alts_jwt fact
+      set_fact:
+        alts_jwt: "{{ generated_alts_jwt.token }}"
+      when: generated_alts_jwt is defined
+  when: not alts_jwt_token
 
-- name: Set alts_jwt_token variable
+- name: Set alts_jwt when is set via vars.yml
   tags:
     - jwt_tokens
     - alts_jwt_token
   set_fact:
-    alts_jwt_token: "{{ alts_jwt.token }}"
-  when: alts_jwt_token is not defined or alts_jwt_token == ""
+    alts_jwt: "{{ alts_jwt_token }}"
+  when: alts_jwt_token
 
 - name: Clone ALBS sources
   tags: clone-albs-sources
