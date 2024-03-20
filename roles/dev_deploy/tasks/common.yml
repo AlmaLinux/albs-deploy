@@ -10,7 +10,6 @@
     name: "{{ item }}"
     state: present
   loop:
-    - requests
     - PyJWT
   become: "yes"
 
@@ -61,39 +60,55 @@
 
 - debug: var=result.stdout_lines
 
-- name: Generate albs_jwt_token
-  tags: 
+- name: Set albs_jwt when is not set via vars.yml
+  tags:
     - jwt_tokens
     - albs_jwt_token
-  shell: >
-    python3 -c "import jwt; import datetime; secret = '{{ albs_jwt_secret }}'; payload = {'sub': '1', 'aud': ['fastapi-users:auth'], 'exp': 1777628461}; token = jwt.encode(payload, secret, algorithm='HS256'); print(token)"
-  register: albs_jwt_result
-  when: albs_jwt_token is not defined or albs_jwt_token == ""
+  block:
+    - name: Generate ALBS JWT
+      jwt_generator:
+        target: albs
+        secret: "{{ albs_jwt_secret }}"
+        user_id: 1
+      register: generated_albs_jwt
+    - name: Set albs_jwt fact
+      set_fact:
+        albs_jwt: "{{ generated_albs_jwt.token }}"
+      when: generated_albs_jwt is defined
+  when: not albs_jwt_token
 
-- name: Set albs_jwt_token variable
+- name: Set albs_jwt when is set via vars.yml
   tags:
     - jwt_tokens
     - albs_jwt_token
   set_fact:
-    albs_jwt_token: "{{ albs_jwt_result.stdout }}"
-  when: albs_jwt_token is not defined or albs_jwt_token == ""
+    albs_jwt: "{{ albs_jwt_token }}"
+  when: albs_jwt_token
 
-- name: Generate alts_jwt_token
+- name: Set alts_jwt when is not set via vars.yml
   tags:
     - jwt_tokens
     - alts_jwt_token
-  shell: >
-    python3 -c "import jwt; import datetime; secret = '{{ alts_jwt_secret }}'; payload = {'email': 'base_user@almalinux.org'}; token = jwt.encode(payload, secret, algorithm='HS256'); print(token)"
-  register: alts_jwt_result
-  when: alts_jwt_token is not defined or alts_jwt_token == ""
+  block:
+    - name: Generate ALTS JWT
+      jwt_generator:
+        target: alts
+        secret: "{{ alts_jwt_secret }}"
+        email: base_user@almalinux.org
+      register: generated_alts_jwt
+    - name: Set alts_jwt fact
+      set_fact:
+        alts_jwt: "{{ generated_alts_jwt.token }}"
+      when: generated_alts_jwt is defined
+  when: not alts_jwt_token
 
-- name: Set alts_jwt_token variable
+- name: Set alts_jwt when is set via vars.yml
   tags:
     - jwt_tokens
     - alts_jwt_token
   set_fact:
-    alts_jwt_token: "{{ alts_jwt_result.stdout }}"
-  when: alts_jwt_token is not defined or alts_jwt_token == ""
+    alts_jwt: "{{ alts_jwt_token }}"
+  when: alts_jwt_token
 
 - name: Clone ALBS sources
   tags: clone-albs-sources
