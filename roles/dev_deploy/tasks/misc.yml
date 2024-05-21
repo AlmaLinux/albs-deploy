@@ -61,7 +61,7 @@
   ansible.builtin.uri:
     url: "{{ albs_api_url_ext }}sign-keys/"
     method: GET
-    headers: 
+    headers:
       accept: application/json
       Authorization: "Bearer {{ albs_jwt_token }}"
     return_content: true
@@ -85,9 +85,9 @@
       platform_id: 1
     body_format: json
     status_code:
-      - 200 
+      - 200
       - 201
-  when: gpg_request_output.json|length == 0 
+  when: gpg_request_output.json|length == 0
 
 - name: Bootstrap repositories
   community.docker.docker_container_exec:
