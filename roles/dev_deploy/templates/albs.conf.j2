@@ -10,6 +10,12 @@ upstream pulp {
     server pulp:80;
 }
 
+{% if 'sign_file' not in excluded_containers %}
+upstream signfile {
+    server sign_file:8000;
+}
+{% endif %}
+
 map $http_upgrade $connection_upgrade {
     default upgrade;
     '' close;
@@ -64,4 +70,11 @@ server {
         }
         proxy_pass http://pulp;
     }
+
+{% if 'sign_file' not in excluded_containers %}
+    location /sign-file/ {
+        proxy_set_header Host $http_host;
+        proxy_pass http://signfile/;
+    }
+{% endif %}
 }
