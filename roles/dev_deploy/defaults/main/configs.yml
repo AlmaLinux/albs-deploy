@@ -6,7 +6,7 @@ generated_configs:
     mode: "0644"
   - sname: albs.conf.j2
     dname: albs.conf
-    dest: "{{ sources_root }}/nginx_configs"
+    dest: "{{ sources_root }}/albs-web-server/nginx_configs"
     mode: "0644"
   - sname: alembic.ini.j2
     dname: alembic.ini
