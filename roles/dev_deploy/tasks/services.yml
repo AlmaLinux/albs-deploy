@@ -31,7 +31,7 @@
       register: services
 
     - name: Create and start each service individually
-      shell: "{{ docker_compose }} -p {{ container_name_prefix }} up -d --build --force-recreate {{ item }}"
+      shell: "{{ docker_compose }} -p {{ container_name_prefix }} --compatibility up -d --build --force-recreate {{ item }}"
       args:
         chdir: "{{ sources_root }}/albs-web-server"
       when: item not in excluded_containers
