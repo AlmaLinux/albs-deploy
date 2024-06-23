@@ -53,5 +53,8 @@ beholder_enabled: false
 nvm_version: "v0.39.3"
 node_version: "16"
 
-excluded_containers: ""
+excluded_containers:
+  - "test_db"
+  - "web_server_tests"
+
 ...

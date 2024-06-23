@@ -47,7 +47,7 @@
   register: output
   when:
     - docker_compose != "not found"
-    - not excluded_containers or excluded_containers == ""
+    - not excluded_containers
 
 - debug:
     var: output
