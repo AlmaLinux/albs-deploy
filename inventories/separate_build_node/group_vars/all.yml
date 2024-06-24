@@ -32,6 +32,9 @@ rabbitmq_vhost: "{{ rabbitmq_vhost }}"
 
 pulp_password: "{{ pulp_password }}"
 
-excluded_containers: ""
+excluded_containers:
+  - "test_db"
+  - "web_server_tests"
+  - "build_node"
 
 ...
