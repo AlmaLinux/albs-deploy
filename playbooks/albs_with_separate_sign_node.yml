@@ -1,9 +1,6 @@
 ---
 - name: Deploy the ALBS
   hosts: albs_vm
-  vars:
-    - excluded_containers:
-        - "sign_node"
   roles:
     - dev_deploy
   tags:
