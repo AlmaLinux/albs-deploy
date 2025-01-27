@@ -18,11 +18,7 @@ You can deploy build system in a really fast way. Let's get started.
   ---
   github_client: <OAuth client id>
   github_client_secret: <OAuth token>
-  immudb_username: <immudb username to be used>
-  immudb_password: <immudb password to be used>
-  immudb_database: <immudb database name to be used>
-  immudb_address: <url in format `host:port` of immudb instance, default port is 3322>
-  immudb_public_key_file: <path of the public key to use>
+
   frontend_baseurl: http://<Preferred hostname or IP address>:8080
   ```
   if you want deploy build system on remote machine add the following parameters.
@@ -140,6 +136,13 @@ albs_jwt_token: <If you have generated JWT token manually set it here>
 albs_jwt_secret: <Secret of yours generated token>
 alts_jwt_secret: <Secret of yours generated token>
 
+# if you want to notarize/authorize build artifacts, you need to provide
+# the following immudb configuration
+immudb_username: <immudb username to be used>
+immudb_password: <immudb password to be used>
+immudb_database: <immudb database name to be used>
+immudb_address: <url in format `host:port` of immudb instance, default port is 3322>
+immudb_public_key_file: <path of the public key to use>
 
 ```
 Of course, you can override the service's default users, passwords and rabbitmq params.
