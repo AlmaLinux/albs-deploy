@@ -1,15 +1,15 @@
 ---
 - name: Create build node systemd service
-  template:
-    dest: "/etc/systemd/system/albs-build-node.service"
-    src: "albs_build_node.service.j2"
-    group: "root"
-    owner: "root"
-    mode: "0644"
+  ansible.builtin.template:
+    dest: /etc/systemd/system/albs-build-node.service
+    src: albs_build_node.service.j2
+    group: root
+    owner: root
+    mode: 0644
 
 - name: Enable and start build node systemd service
-  systemd:
-    name: "albs-build-node.service"
+  ansible.builtin.systemd:
+    name: albs-build-node.service
     masked: no
     state: restarted
     daemon_reload: yes

@@ -1,5 +1,6 @@
 [Unit]
 Description=ALBS build node
+After=network.target remote-fs.target
 
 [Service]
 RemainAfterExit=no
@@ -8,7 +9,7 @@ RestartSec=5s
 Type=simple
 User={{ service_user }}
 Group={{ service_group }}
-ExecStart={{ build_node_venv_directory }}/bin/python3 {{ build_node_working_directory }}/albs-node/almalinux_build_node.py
+ExecStart=/bin/bash -c "{{ build_node_venv_directory }}/bin/python3 {{ build_node_working_directory }}/albs-node/almalinux_build_node.py"
 
 [Install]
 WantedBy=multi-user.target
