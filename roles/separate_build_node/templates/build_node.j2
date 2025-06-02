@@ -1,11 +1,25 @@
 ---
 master_url: "{{ albs_api_url }}"
-base_arch: "{{ machine_arch }}"
 threads_count: {{ threads_count | default(4) }}
+base_arch: "{{ machine_arch }}"
+build_src: {{ build_src | default(True) }}
+{% if exclusions_url is defined and exclusions_url %}
+exclusions_url: "{{ exclusions_url }}"
+{% endif %}
 jwt_token: "{{ albs_jwt_token }}"
 pulp_host: "{{ pulp_host }}"
 pulp_user: "{{ pulp_user }}"
 pulp_password: "{{ pulp_password }}"
+pulp_uploader_max_workers: {{ pulp_uploader_workers | default(2) }}
+{% if sentry_dsn is defined and sentry_dsn %}
+sentry_dsn: "{{ sentry_dsn }}"
+{% endif %}
+{% if sentry_traces_sample_rate is defined and sentry_traces_sample_rate %}
+sentry_traces_sample_rate: {{ sentry_traces_sample_rate }}
+{% endif %}
+{% if sentry_environment is defined and sentry_environment %}
+sentry_environment: {{ sentry_environment }}
+{% endif %}
 {% if immudb_address is defined and immudb_address %}
 immudb_address: "{{ immudb_address }}"
 {% endif %}

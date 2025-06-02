@@ -1,7 +1,7 @@
 ---
 
-- name: Create service user
-  user:
+- name: Create user "{{ service_user }}"
+  ansible.builtin.user:
     name: "{{ service_user }}"
     groups: wheel, mock
     append: yes
@@ -10,7 +10,7 @@
     generate_ssh_key: yes
 
 - name: Create subsequent directories
-  file:
+  ansible.builtin.file:
     path: "{{ item }}"
     state: directory
     recurse: yes
@@ -19,15 +19,17 @@
   with_items: "{{ working_directories }}"
 
 - name: Generate build node config
-  template:
+  ansible.builtin.template:
     src: build_node.j2
     dest: "{{ final_conf_dir }}/build_node.yml"
     owner: "{{ service_user }}"
     group: "{{ service_group }}"
     mode: "0644"
 
-- name: Cloud build node repository
-  git:
+- name: Clone albs-node repository
+  become: yes
+  become_user: "{{ service_user }}"
+  ansible.builtin.git:
     repo: https://github.com/AlmaLinux/albs-node.git
     dest: "{{ build_node_working_directory }}/albs-node"
     clone: yes
@@ -35,11 +37,22 @@
     accept_hostkey: yes
     force: yes
 
-- name: Create venv
+- name: Create Python virtual environment
   become: yes
   become_user: "{{ service_user }}"
-  pip:
-    virtualenv: "{{ build_node_venv_directory }}"
-    virtualenv_command: "python3 -m venv"
+  ansible.builtin.command: python3 -m venv --system-site-packages "{{ build_node_venv_directory }}"
+  args:
+    creates: "{{ build_node_venv_directory }}/bin/activate"
+
+- name: Upgrade pip in virtualenv
+  become: yes
+  become_user: "{{ service_user }}"
+  ansible.builtin.command: "{{ build_node_venv_directory }}/bin/pip install --upgrade pip"
+
+- name: Install requirements into virtualenv
+  become: yes
+  become_user: "{{ service_user }}"
+  ansible.builtin.pip:
     requirements: "{{ build_node_requirements_path }}"
-    virtualenv_site_packages: yes
+    virtualenv: "{{ build_node_venv_directory }}"
+...
