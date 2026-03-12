@@ -1,0 +1,67 @@
+#!/bin/bash
+set -euo pipefail
+
+CONF="$(dirname "$(readlink -f "$0")")/rpm-sign.conf"
+if [[ ! -f "$CONF" ]]; then
+    echo "rpm-sign.local: config not found: $CONF" >&2
+    exit 1
+fi
+
+# Defaults (overridden by conf)
+MTLS_CERT=""
+MTLS_KEY=""
+SERVER_CA=""
+JWT=""
+
+source "$CONF"
+
+if [[ -z "$SERVER_BASE" ]]; then
+    echo "rpm-sign.local: SERVER_BASE not set in $CONF" >&2
+    exit 1
+fi
+
+# Build auth arguments: prefer mTLS, fall back to JWT
+CURL_AUTH=()
+if [[ -n "$MTLS_CERT" && -f "$MTLS_CERT" && -n "$MTLS_KEY" && -f "$MTLS_KEY" ]]; then
+    CURL_AUTH+=(--cert "$MTLS_CERT" --key "$MTLS_KEY")
+elif [[ -n "$JWT" ]]; then
+    CURL_AUTH+=(-H "Cookie: JWT=${JWT}")
+else
+    echo "rpm-sign.local: no auth configured (set MTLS_CERT+MTLS_KEY or JWT)" >&2
+    exit 1
+fi
+
+# Optional: trust a custom CA for the server certificate
+if [[ -n "$SERVER_CA" && -f "$SERVER_CA" ]]; then
+    CURL_AUTH+=(--cacert "$SERVER_CA")
+fi
+
+MODE="$1"
+KEY="$2"
+INPUT="$3"
+OUTPUT="${4:-}"
+
+case "$MODE" in
+    lkmsign)
+        curl -s --fail -X POST \
+            -H "OS: ${KEY}" \
+            -H "Content-Type: multipart/form-data" \
+            "${CURL_AUTH[@]}" \
+            -F "input_file=@${INPUT}" \
+            --output "${OUTPUT}" \
+            "${SERVER_BASE}/sign_module/"
+        ;;
+    rsadgstsign)
+        curl -s --fail -X POST \
+            -H "Sign-Cert: ${KEY}" \
+            -H "Content-Type: multipart/form-data" \
+            "${CURL_AUTH[@]}" \
+            -F "input_file=@${INPUT}" \
+            --output "${INPUT}.sig" \
+            "${SERVER_BASE}/sign_efi_digest/"
+        ;;
+    *)
+        echo "rpm-sign.local: unknown mode: $MODE" >&2
+        exit 1
+        ;;
+esac

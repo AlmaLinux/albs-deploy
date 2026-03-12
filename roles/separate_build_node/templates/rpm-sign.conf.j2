@@ -1,0 +1,15 @@
+SCRIPT_DIR="$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")"
+
+SERVER_BASE="{{ rpm_sign_server_base }}"
+
+# --- Authentication (mTLS is preferred when both are set) ---
+
+# mTLS client certificate (issued by helpers/issue-mtls-cert.sh)
+MTLS_CERT="$SCRIPT_DIR/rpm-sign.pem"
+MTLS_KEY="$SCRIPT_DIR/rpm-sign.key"
+
+# JWT token (fallback when mTLS cert is not available)
+JWT="{{ rpm_sign_jwt }}"
+
+# --- Optional: custom CA for verifying the server certificate ---
+SERVER_CA="$SCRIPT_DIR/rpm-sign-server.pem"

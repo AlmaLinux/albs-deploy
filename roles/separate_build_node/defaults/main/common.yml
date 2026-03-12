@@ -11,6 +11,8 @@ build_node_venv_directory: "{{ home_dir }}/.builder-venv"
 build_node_requirements_path: "{{ build_node_working_directory }}/albs-node/requirements.txt"
 pesign_dir_path: "/opt/pesign"
 powertools_repository_name: crb
+rpm_sign_server_base: ""
+rpm_sign_jwt: ""
 working_directories:
   - "{{ base_work_dir }}"
   - "{{ build_node_working_directory }}"

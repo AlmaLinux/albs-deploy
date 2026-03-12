@@ -13,5 +13,6 @@
     - separate_build_node
   tags:
     - build-node-deploy
+    - pesign
   connection: "{{ 'local' if use_local_connection else 'ssh' }}"
 ...
