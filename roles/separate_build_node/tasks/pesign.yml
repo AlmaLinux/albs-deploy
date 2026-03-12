@@ -1,0 +1,34 @@
+---
+
+- name: Create pesign dir
+  ansible.builtin.file:
+    path: "{{ pesign_dir_path }}"
+    state: directory
+    recurse: yes
+    owner: root
+    group: root
+
+- name: Create modsign script
+  ansible.builtin.template:
+    dest: "{{ pesign_dir_path }}/modsign"
+    src: modsign.j2
+    group: root
+    owner: root
+    mode: 0755
+
+- name: Create pesign script
+  ansible.builtin.template:
+    dest: "{{ pesign_dir_path }}/pesign"
+    src: pesign.j2
+    group: root
+    owner: root
+    mode: 0755
+
+- name: Create pesign-client script
+  ansible.builtin.template:
+    dest: "{{ pesign_dir_path }}/pesign-client"
+    src: pesign-client.j2
+    group: root
+    owner: root
+    mode: 0755
+...

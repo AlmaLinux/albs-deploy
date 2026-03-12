@@ -1,0 +1,7 @@
+#!/bin/bash
+
+SERVER="{{ alma_pesign_server }}/sign_module/"
+
+JWT="{{ pesign_jwt_token }}"
+
+curl -s --fail -X POST -H "os: $1" -H "Content-Type: multipart/form-data" -H "Cookie: JWT=${JWT}" -F "input_file=@$2" --output "$2" ${SERVER}
