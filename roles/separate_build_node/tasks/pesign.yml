@@ -1,0 +1,65 @@
+---
+
+- name: Deploy pesign files
+  become: yes
+  block:
+    - name: Create pesign dir
+      ansible.builtin.file:
+        path: "{{ pesign_dir_path }}"
+        state: directory
+        recurse: yes
+        owner: root
+        group: root
+
+    - name: Create modsign script
+      ansible.builtin.copy:
+        dest: "{{ pesign_dir_path }}/modsign"
+        src: modsign
+        owner: root
+        group: root
+        mode: "0755"
+
+    - name: Create pesign script
+      ansible.builtin.copy:
+        dest: "{{ pesign_dir_path }}/pesign"
+        src: pesign
+        owner: root
+        group: root
+        mode: "0755"
+
+    - name: Create pesign-client script
+      ansible.builtin.copy:
+        dest: "{{ pesign_dir_path }}/pesign-client"
+        src: pesign-client
+        owner: root
+        group: root
+        mode: "0755"
+
+    - name: Deploy rpm-sign config
+      ansible.builtin.copy:
+        dest: "{{ pesign_dir_path }}/rpm-sign.conf"
+        src: rpm-sign.conf
+        owner: root
+        group: mock
+        mode: "0640"
+
+    - name: Deploy rpm-sign certificates and key
+      ansible.builtin.copy:
+        dest: "{{ pesign_dir_path }}/{{ item }}"
+        src: "{{ item }}"
+        owner: root
+        group: mock
+        mode: "0640"
+      loop:
+        - rpm-sign-server.pem
+        - rpm-sign.key
+        - rpm-sign.pem
+
+    - name: Deploy rpm-sign.local script
+      ansible.builtin.copy:
+        dest: "{{ pesign_dir_path }}/rpm-sign.local"
+        src: rpm-sign.local
+        owner: root
+        group: mock
+        mode: "0750"
+...

@@ -26,6 +26,7 @@
     gpgcheck: no
 
 - name: Install required system packages packages
+  become: yes
   ansible.builtin.dnf:
     name: "{{ build_node_dnf_packages }}"
     state: latest

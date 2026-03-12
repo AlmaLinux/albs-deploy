@@ -55,4 +55,6 @@
   ansible.builtin.pip:
     requirements: "{{ build_node_requirements_path }}"
     virtualenv: "{{ build_node_venv_directory }}"
+  tags:
+    - update-env
 ...

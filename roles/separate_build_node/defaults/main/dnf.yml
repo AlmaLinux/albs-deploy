@@ -5,7 +5,6 @@ build_node_dnf_packages:
   - "cmake"
   - "cpio"
   - "createrepo_c"
-  - "ef2sprogs"
   - "fedpkg"
   - "gcc"
   - "gcc-c++"
@@ -13,6 +12,9 @@ build_node_dnf_packages:
   - "htop"
   - "kernel-rpm-macros"
   - "keyrings-filesystem"
+  - "libcurl-devel"
+  - "rustc"
+  - "cargo"
   - "libicu"
   - "libicu-devel"
   - "mc"
@@ -29,4 +31,5 @@ build_node_dnf_packages:
   - "tree"
   - "ubu-keyring"
   - "xmlsec1-openssl-devel"
+  - "rsyslog-logrotate"
 ...
