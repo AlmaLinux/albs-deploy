@@ -53,11 +53,11 @@
 - name: Bootstrap repositories
   community.docker.docker_container_exec:
     container: "{{ container_name_prefix }}_web_server_1"
-    command: python3 scripts/bootstrap_repositories.py -c reference_data/platforms.yaml
+    command: "python3 scripts/bootstrap_repositories.py {{ '-S ' if bootstrap_repositories_no_sync else '' }}-c reference_data/platforms.yaml"
   register: result
   until: result is succeeded
-  retries: 10
-  delay: 15
+  retries: 2
+  delay: 5
   when: is_clean_installation.stat.exists == False
 
 - name: Activate user
@@ -65,6 +65,71 @@
     container: "{{ container_name_prefix }}_web_server_1"
     command: bash -c 'python3 scripts/manage_users.py -e base_user@almalinux.org -t AlmaLinux_team --verify --superuser || true'
   when: is_clean_installation.stat.exists == False
+
+# The JWT initially generated in common.yml uses a guessed user_id and is
+# only there so the first config render isn't empty. Now that the base
+# user actually exists in the DB, regenerate the JWT via the web_server
+# helper so it carries the real id and a fresh expiry, then re-render
+# the configs and recreate the consumer containers.
+- name: Regenerate ALBS JWT for the real base_user
+  tags:
+    - jwt_tokens
+    - albs_jwt_token
+  community.docker.docker_container_exec:
+    container: "{{ container_name_prefix }}_web_server_1"
+    command: >-
+      bash -c 'python3 scripts/generate_token.py
+      -e base_user@almalinux.org -s "{{ albs_jwt_secret }}"
+      | grep -E "^eyJ" | tail -n 1'
+  register: regenerated_albs_jwt
+
+- name: Update albs_jwt fact with regenerated token
+  tags:
+    - jwt_tokens
+    - albs_jwt_token
+  set_fact:
+    albs_jwt: "{{ regenerated_albs_jwt.stdout | trim }}"
+  when:
+    - regenerated_albs_jwt is defined
+    - regenerated_albs_jwt.stdout | default('') | trim | length > 0
+
+- name: Re-render service configs with regenerated JWT
+  tags:
+    - jwt_tokens
+    - albs_jwt_token
+    - configs
+  template:
+    dest: "{{ item.dest }}/{{ item.dname }}"
+    src: "{{ item.sname }}"
+    mode: "{{ item.mode }}"
+    force: yes
+  with_items: "{{ generated_configs }}"
+  when:
+    - regenerated_albs_jwt is defined
+    - regenerated_albs_jwt.stdout | default('') | length > 0
+
+- name: Recreate consumer containers to pick up regenerated JWT
+  tags:
+    - jwt_tokens
+    - albs_jwt_token
+    - services
+  shell: "{{ docker_compose }} -p {{ container_name_prefix }} --compatibility up -d --force-recreate {{ item }}"
+  args:
+    chdir: "{{ sources_root }}/albs-web-server"
+  loop: "{{ services.stdout_lines }}"
+  when:
+    - regenerated_albs_jwt is defined
+    - regenerated_albs_jwt.stdout | default('') | length > 0
+    - item not in excluded_containers
+    - item not in (pre_bootstrap_excluded_containers | default([]))
+    - services is defined
+
+- name: Start containers deferred until after bootstrap
+  shell: "{{ docker_compose }} -p {{ container_name_prefix }} --compatibility up -d --build --force-recreate {{ item }}"
+  args:
+    chdir: "{{ sources_root }}/albs-web-server"
+  loop: "{{ pre_bootstrap_excluded_containers | default([]) }}"
+  when: pre_bootstrap_excluded_containers | default([])
 
 - name: Checking if GPG key exists on web_server
   tags: add_pgp_to_web_server
@@ -76,6 +141,9 @@
       Authorization: "Bearer {{ albs_jwt }}"
     return_content: true
   register: gpg_request_output
+  until: gpg_request_output.status == 200
+  retries: 30
+  delay: 5
 
 - name: Adding GPG key to the web_server
   tags: add_pgp_to_web_server

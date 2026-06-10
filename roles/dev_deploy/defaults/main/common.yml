@@ -33,5 +33,12 @@ created_directories:
 
 packages:
   - "gnupg"
+  - "python3-pip"
+  - "git"
 
 postgres_password: "{{ postgres_password | urlencode  }}"
+
+# When true, bootstrap_repositories.py is invoked with -S to skip syncing
+# repos from their remotes (useful for limited disk space; metadata-only
+# on-demand sync still happens on first package request).
+bootstrap_repositories_no_sync: false

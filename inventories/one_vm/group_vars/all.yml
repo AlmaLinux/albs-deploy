@@ -59,4 +59,11 @@ excluded_containers:
   - "test_db"
   - "web_server_tests"
 
+# Containers that must NOT be started before bootstrap_permissions runs,
+# so a human cannot race the bootstrap by signing in via OAuth and
+# grabbing id=1 ahead of the system user. They are started later from
+# misc.yml after the system user is created.
+pre_bootstrap_excluded_containers:
+  - "nginx"
+
 ...
