@@ -4,10 +4,10 @@ generated_configs:
     dname: alts_config.yaml
     dest: "{{ sources_root }}/alts/configs"
     mode: "0644"
-  - sname: albs.conf.j2
-    dname: albs.conf
-    dest: "{{ sources_root }}/albs-web-server/nginx_configs"
-    mode: "0644"
+  # nginx config (albs.conf) is intentionally NOT templated here — it lives
+  # in the albs-web-server repo at nginx_configs/albs.conf and is mounted
+  # directly into the nginx container. It has no per-deployment values, so
+  # there is no reason to duplicate it as a Jinja template here.
   - sname: alembic.ini.j2
     dname: alembic.ini
     dest: "{{ sources_root }}/albs-web-server/alws"
