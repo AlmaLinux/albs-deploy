@@ -44,6 +44,18 @@
     state: started
   when: is_clean_installation.stat.exists == False
 
+- name: Wait for web_server container to be running
+  community.docker.docker_container_info:
+    name: "{{ container_name_prefix }}_web_server_1"
+  register: web_server_info
+  until: >
+    web_server_info.container is not none
+    and (web_server_info.container.State.Running | bool)
+    and not (web_server_info.container.State.Restarting | bool)
+  retries: 30
+  delay: 10
+  when: is_clean_installation.stat.exists == False
+
 - name: Bootstrap permissions
   community.docker.docker_container_exec:
     container: "{{ container_name_prefix }}_web_server_1"
@@ -129,7 +141,7 @@
   args:
     chdir: "{{ sources_root }}/albs-web-server"
   loop: "{{ pre_bootstrap_excluded_containers | default([]) }}"
-  when: pre_bootstrap_excluded_containers | default([])
+  when: pre_bootstrap_excluded_containers | default([]) | length > 0
 
 - name: Checking if GPG key exists on web_server
   tags: add_pgp_to_web_server

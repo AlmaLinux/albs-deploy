@@ -75,7 +75,7 @@
       set_fact:
         albs_jwt: "{{ generated_albs_jwt.token }}"
       when: generated_albs_jwt is defined
-  when: not albs_jwt_token
+  when: albs_jwt_token | length == 0
 
 - name: Set albs_jwt when is set via vars.yml
   tags:
@@ -83,7 +83,7 @@
     - albs_jwt_token
   set_fact:
     albs_jwt: "{{ albs_jwt_token }}"
-  when: albs_jwt_token
+  when: albs_jwt_token | length > 0
 
 - name: Set alts_jwt when is not set via vars.yml
   tags:
@@ -100,7 +100,7 @@
       set_fact:
         alts_jwt: "{{ generated_alts_jwt.token }}"
       when: generated_alts_jwt is defined
-  when: not alts_jwt_token
+  when: alts_jwt_token | length == 0
 
 - name: Set alts_jwt when is set via vars.yml
   tags:
@@ -108,7 +108,7 @@
     - alts_jwt_token
   set_fact:
     alts_jwt: "{{ alts_jwt_token }}"
-  when: alts_jwt_token
+  when: alts_jwt_token | length > 0
 
 - name: Clone ALBS sources
   tags: clone-albs-sources

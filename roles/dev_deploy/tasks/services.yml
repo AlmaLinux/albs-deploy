@@ -26,7 +26,7 @@
       loop: "{{ services.stdout_lines }}"
   when:
     - docker_compose != "not found"
-    - excluded_containers or (pre_bootstrap_excluded_containers | default([]))
+    - (excluded_containers | length > 0) or (pre_bootstrap_excluded_containers | default([]) | length > 0)
 
 - name: Create and start services
   shell: "{{ docker_compose }} -p {{ container_name_prefix }} --compatibility up -d --build --force-recreate"
@@ -35,8 +35,8 @@
   register: output
   when:
     - docker_compose != "not found"
-    - not excluded_containers
-    - not (pre_bootstrap_excluded_containers | default([]))
+    - excluded_containers | length == 0
+    - pre_bootstrap_excluded_containers | default([]) | length == 0
 
 - debug:
     var: output
