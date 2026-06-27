@@ -39,8 +39,12 @@ rabbitmq_vhost: "rabbitmq"
 pulp_host: "http://pulp"
 pulp_password: "password"
 pulp_user: "admin"
-pulp_database_url: "postgresql+psycopg2://postgres:{{ pulp_password }}@pulp/pulp"
-async_pulp_database_url: "postgresql+asyncpg://postgres:{{ pulp_password }}@pulp/pulp"
+# Pulp runs as a multi-container stack: the "pulp" host (pulp_web alias) is
+# HTTP-only, and the Pulp DB lives in the separate "postgres" service. The DB
+# user/password here must match pulp-postgres.env in the albs-web-server repo
+# (postgres/password).
+pulp_database_url: "postgresql+psycopg2://postgres:{{ pulp_password }}@postgres:5432/pulp"
+async_pulp_database_url: "postgresql+asyncpg://postgres:{{ pulp_password }}@postgres:5432/pulp"
 
 immudb_username: ""
 immudb_password: ""

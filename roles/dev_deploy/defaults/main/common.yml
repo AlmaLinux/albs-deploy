@@ -12,8 +12,6 @@ created_directories:
     mode: "0755"
 #  - path: "{{ volumes_root }}/{{ folder_name_for_result_backend }}"
 #    mode: "0755"
-  - path: "{{ volumes_root }}/pulp/settings"
-    mode: "0755"
   - path: "{{ sources_root }}/albs-sign-node/node-config"
     mode: "0755"
   - path: "{{ sources_root }}/albs-node/node-config/castor"

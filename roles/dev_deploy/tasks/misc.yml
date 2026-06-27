@@ -5,43 +5,20 @@
     path: "{{ volumes_root }}/is_clean_installation"
   register: is_clean_installation
 
+# Pulp runs as a multi-container stack: pulpcore-manager lives in the pulp_api
+# service. The init admin password is seeded to "password" by the
+# pulp_set_init_password one-shot in docker-compose; this resets it to the
+# configured pulp_password if a custom one was provided. The separate postgres
+# service already allows external access over the compose network (scram-sha-256
+# via pulp-postgres.env), so no manual pg_hba/postgresql.conf edits are needed.
 - name: Change pulp password
   community.docker.docker_container_exec:
-    container: "{{ container_name_prefix }}_pulp_1"
+    container: "{{ container_name_prefix }}_pulp_api_1"
     command: "bash -c 'pulpcore-manager reset-admin-password -p {{ pulp_password }}'"
   register: result
   until: result is succeeded
   retries: 10
   delay: 30
-  when: is_clean_installation.stat.exists == False
-
-- name: Enable pulp database external access
-  community.docker.docker_container_exec:
-    container: "{{ container_name_prefix }}_pulp_1"
-    command: >-
-      bash -c "
-      if ! grep -q 'listen_addresses = \*' /var/lib/pgsql/data/postgresql.conf; then
-        echo \"listen_addresses = '*'\" >> /var/lib/pgsql/data/postgresql.conf;
-      fi &&
-      if ! grep -q 'host all all 0.0.0.0/0 md5' /var/lib/pgsql/data/pg_hba.conf; then
-        echo \"host all all 0.0.0.0/0 md5\" >> /var/lib/pgsql/data/pg_hba.conf;
-      fi &&
-      if ! grep -q 'host all all ::/0 md5' /var/lib/pgsql/data/pg_hba.conf; then
-        echo \"host all all ::/0 md5\" >> /var/lib/pgsql/data/pg_hba.conf;
-      fi &&
-      runuser postgres -c 'echo \"ALTER USER postgres WITH PASSWORD '\''{{ pulp_password }}'\'';\" | /usr/bin/psql'"
-  when: is_clean_installation.stat.exists == False
-
-- name: Stop pulp container
-  community.docker.docker_container:
-    name: "{{ container_name_prefix }}_pulp_1"
-    state: stopped
-  when: is_clean_installation.stat.exists == False
-
-- name: Start pulp container
-  community.docker.docker_container:
-    name: "{{ container_name_prefix }}_pulp_1"
-    state: started
   when: is_clean_installation.stat.exists == False
 
 - name: Wait for web_server container to be running
