@@ -8,14 +8,15 @@ generated_configs:
   # in the albs-web-server repo at nginx_configs/albs.conf and is mounted
   # directly into the nginx container. It has no per-deployment values, so
   # there is no reason to duplicate it as a Jinja template here.
-  - sname: alembic.ini.j2
-    dname: alembic.ini
-    dest: "{{ sources_root }}/albs-web-server/alws"
-    mode: "0644"
-  - sname: settings.py.j2
-    dname: settings.py
-    dest: "{{ volumes_root }}/pulp/settings"
-    mode: "0644"
+  # alembic.ini is intentionally NOT templated here — it lives in the
+  # albs-web-server repo at alws/alembic.ini and is used directly. The DB
+  # URL is no longer hardcoded in it; alws/alembic/env.py sets it at runtime
+  # from settings.sync_database_url (SYNC_DATABASE_URL), which is provided
+  # via vars.env. There are no per-deployment values left to template.
+  # Pulp's settings.py is intentionally NOT templated here — it lives in the
+  # albs-web-server repo at assets/pulp/settings.py and is mounted directly into
+  # every Pulp service by docker-compose. The multi-container stack no longer
+  # mounts volumes_root/pulp/settings, and the file has no per-deployment values.
   - sname: albs-gitea-listener-config.yaml.j2
     dname: albs-gitea-listener-config.yaml
     dest: "{{ sources_root }}/albs-web-server/alws/scripts/albs-gitea-listener"
