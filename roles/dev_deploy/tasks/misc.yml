@@ -97,27 +97,38 @@
     - regenerated_albs_jwt is defined
     - regenerated_albs_jwt.stdout | default('') | length > 0
 
+# Recreate all non-excluded consumer containers in a single compose invocation
+# (parallel, depends_on-ordered) instead of a per-service loop. The filtered list
+# is guarded so an empty arg list never makes 'docker compose up' touch ALL
+# services (including the excluded ones).
 - name: Recreate consumer containers to pick up regenerated JWT
   tags:
     - jwt_tokens
     - albs_jwt_token
     - services
-  shell: "{{ docker_compose }} -p {{ container_name_prefix }} --compatibility up -d --force-recreate {{ item }}"
+  vars:
+    consumer_services: >-
+      {{ services.stdout_lines
+         | difference(excluded_containers)
+         | difference(pre_bootstrap_excluded_containers | default([])) }}
+  shell: >-
+    {{ docker_compose }} -p {{ container_name_prefix }} --compatibility
+    up -d --force-recreate {{ consumer_services | join(' ') }}
   args:
     chdir: "{{ sources_root }}/albs-web-server"
-  loop: "{{ services.stdout_lines }}"
   when:
     - regenerated_albs_jwt is defined
     - regenerated_albs_jwt.stdout | default('') | length > 0
-    - item not in excluded_containers
-    - item not in (pre_bootstrap_excluded_containers | default([]))
     - services is defined
+    - consumer_services | length > 0
 
 - name: Start containers deferred until after bootstrap
-  shell: "{{ docker_compose }} -p {{ container_name_prefix }} --compatibility up -d --build --force-recreate {{ item }}"
+  shell: >-
+    {{ docker_compose }} -p {{ container_name_prefix }} --compatibility
+    up -d --build --force-recreate
+    {{ pre_bootstrap_excluded_containers | default([]) | join(' ') }}
   args:
     chdir: "{{ sources_root }}/albs-web-server"
-  loop: "{{ pre_bootstrap_excluded_containers | default([]) }}"
   when: pre_bootstrap_excluded_containers | default([]) | length > 0
 
 - name: Checking if GPG key exists on web_server

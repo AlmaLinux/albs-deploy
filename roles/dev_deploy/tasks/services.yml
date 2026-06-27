@@ -16,14 +16,24 @@
         chdir: "{{ sources_root }}/albs-web-server"
       register: services
 
-    - name: Create and start each service individually
-      shell: "{{ docker_compose }} -p {{ container_name_prefix }} --compatibility up -d --build --force-recreate {{ item }}"
+    # Start all non-excluded services in a single compose invocation so images
+    # build in parallel (BuildKit) and startup respects depends_on. A per-service
+    # loop would serialize the builds. Excluded containers are filtered out of the
+    # service list rather than skipped via 'docker compose up' (which has no
+    # native "all except X" flag). The filtered list is guarded so an empty arg
+    # list never makes 'docker compose up' start ALL services.
+    - name: Create and start non-excluded services
+      vars:
+        included_services: >-
+          {{ services.stdout_lines
+             | difference(excluded_containers)
+             | difference(pre_bootstrap_excluded_containers | default([])) }}
+      shell: >-
+        {{ docker_compose }} -p {{ container_name_prefix }} --compatibility
+        up -d --build --force-recreate {{ included_services | join(' ') }}
       args:
         chdir: "{{ sources_root }}/albs-web-server"
-      when:
-        - item not in excluded_containers
-        - item not in (pre_bootstrap_excluded_containers | default([]))
-      loop: "{{ services.stdout_lines }}"
+      when: included_services | length > 0
   when:
     - docker_compose != "not found"
     - (excluded_containers | length > 0) or (pre_bootstrap_excluded_containers | default([]) | length > 0)
