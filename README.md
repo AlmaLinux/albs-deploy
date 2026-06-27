@@ -144,6 +144,10 @@ immudb_database: <immudb database name to be used>
 immudb_address: <url in format `host:port` of immudb instance, default port is 3322>
 immudb_public_key_file: <path of the public key to use>
 
+# minutes a build task may go without a ping from its build node before it
+# expires and becomes available for a build node to pick up again (default: 20)
+build_task_expiration_minutes: <number of minutes, e.g. 20>
+
 ```
 Of course, you can override the service's default users, passwords and rabbitmq params.
 ```yaml
