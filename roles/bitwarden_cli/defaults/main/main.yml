@@ -28,6 +28,10 @@ bitwarden_cli_config_user: "root"
 bitwarden_master_password: ""
 
 # Path the role writes the master password to, and the path consumers
-# (sign-node config, sign-file config, bw-ensure-session) read from.
-bitwarden_password_file: "/home/{{ bitwarden_cli_config_user }}/.bw-master"
+# (sign-node config, sign-file config, bw-ensure-session) read from. Keyed on
+# service_user so it resolves IDENTICALLY in every role: bitwarden_cli_config_user
+# is set only as a role-scoped var on this role, so consumers (separate_sign_*)
+# would otherwise fall back to its "root" default and read a different path than
+# the one written here. Falls back to bitwarden_cli_config_user for generic use.
+bitwarden_password_file: "/home/{{ service_user | default(bitwarden_cli_config_user) }}/.config/.bw-master"
 ...

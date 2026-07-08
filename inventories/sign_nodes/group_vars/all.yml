@@ -40,7 +40,7 @@ bitwarden_master_password: ""
 # Managed path the role writes the master password to; bw-ensure-session and
 # the service configs read from here. Override only if you provision the file
 # out-of-band (leave bitwarden_master_password empty in that case).
-bitwarden_password_file: "/home/{{ service_user }}/.bw-master"
+bitwarden_password_file: "/home/{{ service_user }}/.config/.bw-master"
 # Inline password alternative — single-worker sign-file only, less safe. Leave
 # empty when using bitwarden_master_password + bitwarden_password_file.
 bitwarden_password: ""
