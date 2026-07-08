@@ -96,6 +96,24 @@
     - pgp_keys | length == 0
     - secret_keys.stdout | trim == ""
 
+# Declaring pgp_keys is authoritative and skips import/generation, so a key id
+# that is not actually in the keyring would be written into the service configs
+# and fail only at sign time (the node silently skips packages it can't sign).
+# Verify each declared key is present as a secret key here instead.
+- name: Verify every declared signing key is present in the keyring
+  vars:
+    keyring_ids: "{{ secret_keys.stdout_lines | map('upper') | list }}"
+    missing_keys: "{{ pgp_keys | map('upper') | reject('in', keyring_ids) | list }}"
+  ansible.builtin.fail:
+    msg: >-
+      Declared pgp_keys not found as secret keys in {{ inventory_hostname }}'s
+      keyring: {{ missing_keys | join(', ') }}. Provide the private key(s) via
+      gpg_import_keys, pre-provision them on the host, or fix pgp_keys. Ids must
+      be the 16-char long key id as shown by `gpg --list-secret-keys`.
+  when:
+    - pgp_keys | length > 0
+    - missing_keys | length > 0
+
 - name: Resolve the gpg_keys fact used by both service roles
   ansible.builtin.set_fact:
     gpg_keys: "{{ pgp_keys if (pgp_keys | length > 0) else secret_keys.stdout_lines }}"

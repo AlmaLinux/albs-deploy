@@ -42,4 +42,18 @@
   ansible.builtin.command: "{{ bitwarden_cli_install_dir }}/bw config server {{ bitwarden_url }}"
   register: bw_config_server
   changed_when: "'Saved' in (bw_config_server.stdout | default(''))"
+
+# Materialize the master password so `bw login/unlock --passwordfile` (and the
+# service configs) can read it. Skipped when bitwarden_master_password is empty
+# — then the file is expected to be provisioned out-of-band.
+- name: Write the Bitwarden master password file
+  become: yes
+  ansible.builtin.copy:
+    content: "{{ bitwarden_master_password }}"
+    dest: "{{ bitwarden_password_file }}"
+    owner: "{{ bitwarden_cli_config_user }}"
+    group: "{{ bitwarden_cli_config_user }}"
+    mode: "0600"
+  no_log: yes
+  when: bitwarden_master_password | length > 0
 ...

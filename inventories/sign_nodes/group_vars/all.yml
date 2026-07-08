@@ -33,8 +33,16 @@ bitwarden_enabled: false
 # sign_common role installs the bw CLI and runs `bw config server` with this.
 bitwarden_url: ""
 bitwarden_username: ""
-# Prefer a password file over an inline password.
-bitwarden_password_file: ""
+# Master vault password. Supply via Ansible Vault (do NOT commit plaintext);
+# pass with --vault-password-file, or override with -e. The bitwarden_cli role
+# writes it to bitwarden_password_file on each host (0600, owned by service_user).
+bitwarden_master_password: ""
+# Managed path the role writes the master password to; bw-ensure-session and
+# the service configs read from here. Override only if you provision the file
+# out-of-band (leave bitwarden_master_password empty in that case).
+bitwarden_password_file: "/home/{{ service_user }}/.bw-master"
+# Inline password alternative — single-worker sign-file only, less safe. Leave
+# empty when using bitwarden_master_password + bitwarden_password_file.
 bitwarden_password: ""
 # Optional: restrict the lookup to a single collection UUID.
 bitwarden_collection_id: ""

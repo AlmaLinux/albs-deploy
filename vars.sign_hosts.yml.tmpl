@@ -19,12 +19,28 @@ service_user: albs-signer
 service_group: albs-signer
 
 # --- GPG keys (sign_common) -------------------------------------------------
-# Per host, set `pgp_keys` in host_vars to that host's 16-char key id(s).
-# Set globally here ONLY if every host shares the same key.
+# Each host's signing key is resolved in this order:
+#   1. `pgp_keys`         - authoritative list of 16-char long key ids the host
+#                           signs with. The play FAILS if a declared id is not
+#                           actually a secret key in the host keyring, so the
+#                           key must already be present or imported (see below).
+#   2. existing keyring   - if `pgp_keys` is empty, every secret key already in
+#                           the host keyring is used.
+#   3. auto-generated key - only if the above find nothing AND
+#                           `sign_generate_gpg_key` is true (dev convenience).
 #
-# sign_generate_gpg_key: auto-generate a dev key on hosts that declare none.
-#   Set false in prod to require externally provisioned keys (import or
-#   pre-seeded) and fail loudly if a host has none.
+# To PROVIDE ALREADY-EXISTING / SUPPORTED KEYS (the prod path), set both of
+# these PER HOST in inventories/sign_nodes/host_vars/<host>.yml — they are
+# per-host, not shared, so they do NOT belong in this file:
+#   pgp_keys:                     # the key id(s) this host signs with
+#     - "7C3955C2A345DA89"
+#   gpg_import_keys:              # optional: private key file(s) on the control
+#     - files/keys/sign01.asc     # node to import before resolution
+#
+# Set `pgp_keys` globally HERE only if every host genuinely shares one key.
+#
+# sign_generate_gpg_key: set false in prod so hosts without a provided/pre-seeded
+#   key fail loudly instead of silently signing with an auto-generated dev key.
 sign_generate_gpg_key: true
 gpg_default_email: test@albs.local
 gpg_default_password: "<dev passphrase for the auto-generated key>"
@@ -64,8 +80,14 @@ sign_file_db_backend: sqlite
 bitwarden_enabled: false
 bitwarden_url: "<https://vault.bitwarden.com or self-hosted URL>"
 bitwarden_username: "<Bitwarden account email>"
-# Prefer a password file over an inline password.
-bitwarden_password_file: "<path to file holding the master password>"
-# bitwarden_password: "<inline master password (less safe)>"
+# Master vault password. Do NOT commit plaintext — keep this file (or just this
+# value) in Ansible Vault and pass --vault-password-file. The bitwarden_cli role
+# writes it to bitwarden_password_file on each host (0600, owned by service_user).
+bitwarden_master_password: "<Bitwarden master password (vault-encrypt this)>"
+# Managed path the role writes the password to (default below). Override only if
+# you provision the file yourself; then leave bitwarden_master_password empty.
+# bitwarden_password_file: "/home/albs-signer/.bw-master"
+# Inline password alternative — single-worker sign-file only, less safe:
+# bitwarden_password: "<inline master password>"
 # bitwarden_collection_id: "<optional collection UUID to scope the lookup>"
 # bitwarden_cli_version: "2026.4.1"   # override the pinned CLI version if needed
