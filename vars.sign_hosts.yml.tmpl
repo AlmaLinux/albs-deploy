@@ -1,0 +1,71 @@
+---
+# Variables for the sign-hosts deploy (playbooks/albs_sign_hosts.yml).
+# Copy to vars.sign_hosts.yml, fill in, and run:
+#   ansible-playbook -i inventories/sign_nodes -u <user> \
+#       -e "@vars.sign_hosts.yml" playbooks/albs_sign_hosts.yml
+#
+# NOTE: per-host values (each host's address and signing key) belong in
+# inventories/sign_nodes/host_vars/<host>.yml, NOT here — this file holds the
+# settings shared by every sign host. See the host_vars examples in that dir.
+
+# --- Connection -------------------------------------------------------------
+# ALBS master (web-server) the sign nodes talk to.
+albs_address: <IP or hostname of the ALBS web server>
+use_local_connection: false          # false for remote multi-host deploys
+ansible_interpreter_path: auto
+
+# --- Identity (sign_common) -------------------------------------------------
+service_user: albs-signer
+service_group: albs-signer
+
+# --- GPG keys (sign_common) -------------------------------------------------
+# Per host, set `pgp_keys` in host_vars to that host's 16-char key id(s).
+# Set globally here ONLY if every host shares the same key.
+#
+# sign_generate_gpg_key: auto-generate a dev key on hosts that declare none.
+#   Set false in prod to require externally provisioned keys (import or
+#   pre-seeded) and fail loudly if a host has none.
+sign_generate_gpg_key: true
+gpg_default_email: test@albs.local
+gpg_default_password: "<dev passphrase for the auto-generated key>"
+
+# --- Environment: dev vs prod -----------------------------------------------
+# true  = dev: static passphrase unlocks keys, sign-file seeds a test DB user.
+# false = prod: no static passphrase; passphrases come from Bitwarden.
+sign_dev_mode: true
+
+# --- albs-sign-node ---------------------------------------------------------
+albs_jwt_token: "<JWT the sign node uses to reach the master>"
+albs_jwt_secret: "<secret the token was signed with>"
+pulp_user: <pulp user>
+pulp_password: <pulp password>
+# immudb notarization (optional) — omit all four to disable.
+# immudb_address: <host:port>
+# immudb_database: <db name>
+# immudb_username: <user>
+# immudb_password: <password>
+
+# --- albs-sign-file ---------------------------------------------------------
+sign_file_workers: 4                  # >1 triggers the shared BW_SESSION path
+sign_file_jwt_secret: "<sign-file JWT secret>"
+# Database backend: sqlite (standalone, no extra deps) or postgresql.
+sign_file_db_backend: sqlite
+# PostgreSQL settings (used only when sign_file_db_backend == postgresql).
+# The database and role must already exist — the role creates only the schema.
+# sign_file_pg_host: <postgres host>
+# sign_file_pg_port: 5432
+# sign_file_pg_name: signfile
+# sign_file_pg_user: signfile
+# sign_file_pg_password: <postgres password>
+
+# --- Bitwarden (bitwarden_cli + prod passphrases) ---------------------------
+# Enable in prod so both services fetch key passphrases from Bitwarden.
+# The bitwarden_cli role installs the CLI and runs `bw config server`.
+bitwarden_enabled: false
+bitwarden_url: "<https://vault.bitwarden.com or self-hosted URL>"
+bitwarden_username: "<Bitwarden account email>"
+# Prefer a password file over an inline password.
+bitwarden_password_file: "<path to file holding the master password>"
+# bitwarden_password: "<inline master password (less safe)>"
+# bitwarden_collection_id: "<optional collection UUID to scope the lookup>"
+# bitwarden_cli_version: "2026.4.1"   # override the pinned CLI version if needed

@@ -1,0 +1,19 @@
+---
+- name: Install the albs-sign-file systemd unit
+  ansible.builtin.template:
+    dest: /etc/systemd/system/albs-sign-file.service
+    src: albs-sign-file.service.j2
+    owner: root
+    group: root
+    mode: "0644"
+  become: yes
+
+- name: Enable and (re)start the albs-sign-file service
+  ansible.builtin.systemd:
+    name: albs-sign-file.service
+    state: restarted
+    enabled: yes
+    daemon_reload: yes
+    masked: no
+  become: yes
+...

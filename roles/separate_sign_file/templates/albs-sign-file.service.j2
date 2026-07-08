@@ -1,0 +1,34 @@
+[Unit]
+Description=ALBS Sign File service
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User={{ service_user }}
+Group={{ service_group }}
+WorkingDirectory={{ sign_file_working_directory }}
+Environment=SF_CONFIG_FILE={{ sign_file_config_file }}
+{% if sign_dev_mode | default(true) | bool %}
+# Dev only: unlock signing keys with a static passphrase. Never set in prod —
+# prod uses Bitwarden (see config.yaml).
+Environment=SF_PASS_DB_DEV_MODE=True
+Environment=SF_PASS_DB_DEV_PASS={{ gpg_default_password }}
+{% endif %}
+{% if sign_file_bw_session_required | bool %}
+# Multi-worker + Bitwarden: establish ONE shared session and export it so every
+# uvicorn worker reuses it instead of racing `bw login`/`bw unlock`. bash -c
+# only sets BW_SESSION from the helper, then `exec`s uvicorn (which becomes the
+# service main process). $$ escapes the $ so systemd passes it through to bash.
+ExecStart=/bin/bash -c 'export BW_SESSION="$$({{ bitwarden_cli_install_dir | default("/usr/local/bin") }}/bw-ensure-session "{{ bitwarden_username }}" "{{ bitwarden_password_file }}")"; exec {{ sign_file_venv_directory }}/bin/uvicorn sign.app:app --host {{ sign_file_bind_host }} --port {{ sign_file_port }} --workers {{ sign_file_workers }}'
+{% else %}
+ExecStart={{ sign_file_venv_directory }}/bin/uvicorn sign.app:app \
+    --host {{ sign_file_bind_host }} \
+    --port {{ sign_file_port }} \
+    --workers {{ sign_file_workers }}
+{% endif %}
+Restart=on-failure
+RestartSec=5s
+
+[Install]
+WantedBy=multi-user.target

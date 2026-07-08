@@ -1,0 +1,20 @@
+---
+- name: Deploy albs-sign-file on a sign host
+  block:
+    # Multi-worker + Bitwarden shares ONE session established by
+    # bw-ensure-session, which logs in/unlocks via --passwordfile. An inline
+    # bitwarden_password cannot satisfy that path, so require the file form.
+    - name: Require a Bitwarden password file for the multi-worker session
+      ansible.builtin.assert:
+        that:
+          - bitwarden_password_file | default('') | length > 0
+        fail_msg: >-
+          sign_file_workers > 1 with Bitwarden enabled needs a shared session
+          via bw-ensure-session, which requires bitwarden_password_file. Set
+          bitwarden_password_file (an inline bitwarden_password will not work),
+          or run sign-file with a single worker.
+      when: sign_file_bw_session_required | bool
+
+    - include_tasks: create_env.yml
+    - include_tasks: install_systemd_service.yml
+...

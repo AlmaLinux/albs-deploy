@@ -1,0 +1,23 @@
+---
+# Reusable role: install the Bitwarden CLI system-wide and point it at a
+# server. Include it from any service that fetches secrets from Bitwarden.
+#
+# Consumers typically include it conditionally and set the config user, e.g.:
+#   - role: bitwarden_cli
+#     when: bitwarden_enabled | bool
+#     vars:
+#       bitwarden_cli_config_user: "{{ service_user }}"
+
+bitwarden_cli_version: "2026.4.1"
+bitwarden_cli_url: "https://github.com/bitwarden/clients/releases/download/cli-v{{ bitwarden_cli_version }}/bw-linux-{{ bitwarden_cli_version }}.zip"
+
+# Install dir must be on PATH for every user on the host.
+bitwarden_cli_install_dir: "/usr/local/bin"
+
+# Bitwarden server URL (vault.bitwarden.com or a self-hosted instance).
+bitwarden_url: ""
+
+# User under which `bw config server` runs (writes that user's CLI config).
+# Each consuming service overrides this with its own service account.
+bitwarden_cli_config_user: "root"
+...

@@ -1,0 +1,58 @@
+---
+# albs-sign-file: standalone FastAPI signing API (uvicorn, port 8000).
+# Runs as the shared sign service user and reads the host keyring resolved by
+# the sign_common role (the `gpg_keys` fact). Its own isolated venv is built
+# with the system Python 3.9 — never shared with albs-sign-node.
+
+sign_file_repo: "https://github.com/AlmaLinux/albs-sign-file.git"
+sign_file_repo_version: "master"
+
+sign_file_working_directory: "/home/{{ service_user }}/albs-sign-file"
+sign_file_venv_directory: "{{ sign_file_working_directory }}/venv"
+
+sign_file_config_dir: "/etc/sign-file"
+sign_file_config_file: "{{ sign_file_config_dir }}/config.yaml"
+
+# Multi-worker runs need ONE shared Bitwarden session (each worker must not
+# race `bw login`/`bw unlock`). When true, ExecStart establishes the session
+# via bw-ensure-session and exports BW_SESSION before exec'ing uvicorn.
+sign_file_bw_session_required: "{{ (bitwarden_enabled | default(false) | bool) and (sign_file_workers | int > 1) }}"
+
+# Database backend: "sqlite" (default; keeps a standalone host dependency-free)
+# or "postgresql" (point at an existing DB + role — this role does NOT create
+# the Postgres database or user, only the schema via migrations).
+sign_file_db_backend: "sqlite"
+
+# SQLite settings
+sign_file_db_path: "/home/{{ service_user }}/sign-file.sqlite3"
+
+# PostgreSQL settings (used when sign_file_db_backend == "postgresql")
+sign_file_pg_host: "localhost"
+sign_file_pg_port: 5432
+sign_file_pg_name: "signfile"
+sign_file_pg_user: "signfile"
+sign_file_pg_password: "signfile"
+
+# Effective DB URL, derived from the backend. Override directly if you need a
+# URL shape not covered here.
+sign_file_db_url: >-
+  {{ ('sqlite:///' ~ sign_file_db_path)
+     if sign_file_db_backend == 'sqlite'
+     else ('postgresql://' ~ sign_file_pg_user ~ ':' ~ sign_file_pg_password
+           ~ '@' ~ sign_file_pg_host ~ ':' ~ (sign_file_pg_port | string)
+           ~ '/' ~ sign_file_pg_name) }}
+
+sign_file_bind_host: "0.0.0.0"
+sign_file_port: 8000
+sign_file_workers: 4
+
+sign_file_root_url: "/sign-file"
+sign_file_jwt_secret: "access-secret"
+sign_file_gpg_binary: "/usr/bin/gpg2"
+sign_file_keyring: "/home/{{ service_user }}/.gnupg/pubring.kbx"
+
+# Passphrase handling is driven by the shared `sign_dev_mode` and Bitwarden
+# vars (see inventory group_vars). In dev, the static dev passphrase env vars
+# are written to the unit; in prod they are omitted and Bitwarden (rendered
+# into config.yaml) supplies passphrases.
+...

@@ -1,0 +1,45 @@
+---
+- name: Require a Bitwarden server URL
+  ansible.builtin.assert:
+    that:
+      - bitwarden_url | length > 0
+    fail_msg: "bitwarden_cli role included but bitwarden_url is not set."
+
+- name: Install unzip (needed to unpack the CLI archive)
+  ansible.builtin.dnf:
+    name: unzip
+    state: present
+  become: yes
+
+- name: Download and unpack the Bitwarden CLI onto PATH
+  ansible.builtin.unarchive:
+    src: "{{ bitwarden_cli_url }}"
+    dest: "{{ bitwarden_cli_install_dir }}"
+    remote_src: yes
+    creates: "{{ bitwarden_cli_install_dir }}/bw"
+  become: yes
+
+- name: Ensure the bw binary is executable for all users
+  ansible.builtin.file:
+    path: "{{ bitwarden_cli_install_dir }}/bw"
+    owner: root
+    group: root
+    mode: "0755"
+  become: yes
+
+- name: Install the bw-ensure-session helper onto PATH
+  ansible.builtin.copy:
+    src: bw-ensure-session.sh
+    dest: "{{ bitwarden_cli_install_dir }}/bw-ensure-session"
+    owner: root
+    group: root
+    mode: "0755"
+  become: yes
+
+- name: Point the Bitwarden CLI at the server
+  become: yes
+  become_user: "{{ bitwarden_cli_config_user }}"
+  ansible.builtin.command: "{{ bitwarden_cli_install_dir }}/bw config server {{ bitwarden_url }}"
+  register: bw_config_server
+  changed_when: "'Saved' in (bw_config_server.stdout | default(''))"
+...

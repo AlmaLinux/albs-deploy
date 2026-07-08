@@ -1,13 +1,6 @@
 ---
-- name: Create service user
-  user:
-    name: "{{ service_user }}"
-    groups: wheel
-    append: yes
-    state: present
-    create_home: yes
-    generate_ssh_key: yes
-  become: "yes"
+# The service user and the GnuPG keyring (the `gpg_keys` fact used below) are
+# provisioned by the sign_common role, which must run before this one.
 
 - name: Remove venv if exists
   file:
@@ -25,39 +18,6 @@
     owner: "{{ service_user }}"
     group: "{{ service_group }}"
   with_items: "{{ working_directories }}"
-
-- name: Get already existing GPG key's fingerprint
-  become_user: "{{ service_user }}"
-  become: "yes"
-  shell: "gpg --list-keys test@albs.local | head -n 2 | tail -1"
-  register: gpg_key_fingerprint
-
-- name: Generate a GPG scenario
-  become_user: "{{ service_user }}"
-  become: "yes"
-  template:
-    dest: "{{ gpg_key_scenario.dest }}/{{ gpg_key_scenario.name }}"
-    src: "{{ gpg_key_scenario.name }}.j2"
-    owner: "{{ gpg_key_scenario.owner }}"
-    mode: "{{ gpg_key_scenario.mode }}"
-    force: yes
-
-- name: Generate GPG key
-  become_user: "{{ service_user }}"
-  become: "yes"
-  shell: "gpg --batch --gen-key {{ gpg_key_scenario.dest }}/{{ gpg_key_scenario.name }}"
-  when: gpg_key_fingerprint.stdout == ""
-
-- name: Get already existing GPG key's fingerprint
-  become_user: "{{ service_user }}"
-  become: "yes"
-  shell: "gpg --list-keys test@albs.local | head -n 2 | tail -1"
-  register: gpg_key_fingerprint
-
-- name: Set GPG key
-  set_fact:
-    gpg_keys:
-      - "{{ gpg_key_fingerprint.stdout[-16:] }}"
 
 - name: Generate sign node config
   become_user: "{{ service_user }}"

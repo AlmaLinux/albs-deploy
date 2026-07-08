@@ -1,0 +1,54 @@
+---
+# ALBS master the sign nodes talk to. Set to the web-server host address.
+albs_address: "localhost"
+
+# Multi-host deploy is remote; each host is reached over SSH via its
+# per-host ansible_host (see host_vars/).
+use_local_connection: false
+use_already_cloned_repos: false
+ansible_interpreter_path: auto
+
+# --- Shared identity + GPG (consumed by sign_common) ------------------------
+service_user: "albs-signer"
+service_group: "albs-signer"
+
+# Auto-generate a dev key on hosts that declare no key. Set to false to require
+# externally provisioned keys (see per-host pgp_keys / gpg_import_keys).
+sign_generate_gpg_key: true
+gpg_default_email: "test@albs.local"
+gpg_default_password: "1234567890"
+
+# --- Environment: dev vs prod -----------------------------------------------
+# Dev unlocks signing keys with a static passphrase (gpg_default_password) and,
+# for sign-file, seeds a test DB user. PROD MUST set this to false: the static
+# dev passphrase env vars are then NOT written, and key passphrases come from
+# Bitwarden instead (enable the block below).
+sign_dev_mode: true
+
+# --- Bitwarden (prod passphrases for BOTH sign-node and sign-file) ----------
+# When enabled, each service fetches its GPG key passphrases from Bitwarden:
+# create one login item per key id (item NAME == key id, PASSWORD == passphrase).
+bitwarden_enabled: false
+# Bitwarden server URL (vault.bitwarden.com or a self-hosted instance). The
+# sign_common role installs the bw CLI and runs `bw config server` with this.
+bitwarden_url: ""
+bitwarden_username: ""
+# Prefer a password file over an inline password.
+bitwarden_password_file: ""
+bitwarden_password: ""
+# Optional: restrict the lookup to a single collection UUID.
+bitwarden_collection_id: ""
+
+# --- albs-sign-node settings ------------------------------------------------
+albs_jwt_token: ""
+albs_jwt_secret: "secret"
+
+pulp_user: "admin"
+pulp_password: "password"
+
+# immudb (optional) — leave unset to disable notarization on the sign node.
+# immudb_address: ""
+# immudb_database: ""
+# immudb_username: ""
+# immudb_password: ""
+...

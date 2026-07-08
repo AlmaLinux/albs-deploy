@@ -1,0 +1,38 @@
+---
+# Identity shared by both sign services on a host. Both albs-sign-node and
+# albs-sign-file run as this user and read the SAME GnuPG keyring, so the
+# service user is created once here.
+service_user: "albs-signer"
+service_group: "albs-signer"
+
+# Base OS packages needed by both services. Python is the system interpreter
+# (Python 3.9 on AlmaLinux 9); each service builds its OWN venv from it, so no
+# pip/venv work happens in this role.
+sign_common_packages:
+  - gnupg2
+  - pinentry
+  - git
+  - python3
+  - python3-devel
+  - gcc
+
+# --- GPG key handling -------------------------------------------------------
+# Set `pgp_keys` per host (host_vars) to the 16-char key id(s) that host signs
+# with. It is authoritative when non-empty. Leave empty to fall back to the
+# host keyring, or to auto-generation.
+pgp_keys: []
+
+# Optional: private key files (on the control node) to import into the host
+# keyring before resolving `gpg_keys`. Use for real, distinct per-host keys.
+gpg_import_keys: []
+
+# Set to false on hosts where keys are provisioned externally (imported or
+# already present). When false and no key can be found, the play fails loudly
+# instead of silently signing with a wrong/absent key.
+sign_generate_gpg_key: true
+
+# Identity + passphrase for an auto-generated dev key (only used when
+# sign_generate_gpg_key is true and no key is present).
+gpg_default_email: "test@albs.local"
+gpg_default_password: "1234567890"
+...

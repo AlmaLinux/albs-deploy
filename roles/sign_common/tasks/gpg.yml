@@ -1,0 +1,102 @@
+---
+# Resolve the host's signing key(s) into the `gpg_keys` fact, which both
+# service roles consume (sign_node.yml / albs-sign-file config.yaml).
+#
+# Resolution order:
+#   1. Explicit `pgp_keys` (host_vars)          -> authoritative
+#   2. Key(s) already in the host keyring       -> derive key ids
+#   3. Auto-generated dev key                   -> only if sign_generate_gpg_key
+#
+# The keyring is the service user's ~/.gnupg, shared by both services.
+
+- name: Stage provided private keys on the host
+  become: yes
+  become_user: "{{ service_user }}"
+  ansible.builtin.copy:
+    src: "{{ item }}"
+    dest: "{{ ('~/' ~ 'sign-import-' ~ idx ~ '.asc') | expanduser }}"
+    mode: "0600"
+  loop: "{{ gpg_import_keys }}"
+  loop_control:
+    index_var: idx
+  when: gpg_import_keys | length > 0
+
+- name: Import provided private keys into the keyring
+  become: yes
+  become_user: "{{ service_user }}"
+  ansible.builtin.command: "gpg --batch --import {{ ('~/' ~ 'sign-import-' ~ idx ~ '.asc') | expanduser }}"
+  loop: "{{ gpg_import_keys }}"
+  loop_control:
+    index_var: idx
+  when: gpg_import_keys | length > 0
+  register: gpg_import_result
+  changed_when: "'imported' in (gpg_import_result.stderr | default(''))"
+
+- name: Remove staged private key files
+  become: yes
+  become_user: "{{ service_user }}"
+  ansible.builtin.file:
+    path: "{{ ('~/' ~ 'sign-import-' ~ idx ~ '.asc') | expanduser }}"
+    state: absent
+  loop: "{{ gpg_import_keys }}"
+  loop_control:
+    index_var: idx
+  when: gpg_import_keys | length > 0
+
+- name: Check for existing secret keys in the keyring
+  become: yes
+  become_user: "{{ service_user }}"
+  ansible.builtin.shell: >-
+    set -o pipefail;
+    gpg --list-secret-keys --with-colons | awk -F: '/^sec:/ {print $5}'
+  args:
+    executable: /bin/bash
+  register: existing_secret_keys
+  changed_when: false
+
+- name: Generate a dev GPG key (no key present and generation enabled)
+  when:
+    - pgp_keys | length == 0
+    - existing_secret_keys.stdout | trim == ""
+    - sign_generate_gpg_key | bool
+  block:
+    - name: Render the GPG key generation scenario
+      become: yes
+      become_user: "{{ service_user }}"
+      ansible.builtin.template:
+        src: gpg-key-scenario.j2
+        dest: "{{ '~/gpg-key-scenario' | expanduser }}"
+        mode: "0600"
+        force: yes
+
+    - name: Generate the GPG key
+      become: yes
+      become_user: "{{ service_user }}"
+      ansible.builtin.command: "gpg --batch --gen-key {{ '~/gpg-key-scenario' | expanduser }}"
+      changed_when: true
+
+- name: Re-read secret keys after optional generation
+  become: yes
+  become_user: "{{ service_user }}"
+  ansible.builtin.shell: >-
+    set -o pipefail;
+    gpg --list-secret-keys --with-colons | awk -F: '/^sec:/ {print $5}'
+  args:
+    executable: /bin/bash
+  register: secret_keys
+  changed_when: false
+
+- name: Fail when no signing key is available
+  ansible.builtin.fail:
+    msg: >-
+      No signing key on {{ inventory_hostname }}: `pgp_keys` is unset, the
+      keyring holds no secret key, and sign_generate_gpg_key is false. Provide
+      `pgp_keys` (and `gpg_import_keys`), or enable generation.
+  when:
+    - pgp_keys | length == 0
+    - secret_keys.stdout | trim == ""
+
+- name: Resolve the gpg_keys fact used by both service roles
+  ansible.builtin.set_fact:
+    gpg_keys: "{{ pgp_keys if (pgp_keys | length > 0) else secret_keys.stdout_lines }}"
+...

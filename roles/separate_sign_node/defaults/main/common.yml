@@ -13,6 +13,6 @@ working_directories:
   - "{{ sign_node_venv_directory }}"
   - "{{ base_work_dir }}/sign_node"
   - "{{ final_conf_dir }}"
-service_group: "alt"
-service_user: "alt"
+service_group: "albs-signer"
+service_user: "albs-signer"
 ...

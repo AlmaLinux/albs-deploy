@@ -1,0 +1,36 @@
+# albs-sign-file configuration — managed by Ansible (separate_sign_file role).
+# Loaded via SF_CONFIG_FILE. SF_* env vars still override any value here.
+
+signing_backend: gpg
+root_url: "{{ sign_file_root_url }}"
+
+gpg:
+  binary: "{{ sign_file_gpg_binary }}"
+  keyring: "{{ sign_file_keyring }}"
+  locks_dir: /tmp/gpg_locks
+  keys:
+{% for key in gpg_keys %}
+    - "{{ key }}"
+{% endfor %}
+
+database:
+  url: "{{ sign_file_db_url }}"
+
+jwt:
+  secret_key: "{{ sign_file_jwt_secret }}"
+  expire_minutes: 30
+  algorithm: HS256
+
+bitwarden:
+  enabled: {{ bitwarden_enabled | default(false) | bool | to_json }}
+{% if bitwarden_enabled | default(false) | bool %}
+  username: "{{ bitwarden_username }}"
+{% if bitwarden_password_file | default('') %}
+  password_file: "{{ bitwarden_password_file }}"
+{% elif bitwarden_password | default('') %}
+  password: "{{ bitwarden_password }}"
+{% endif %}
+{% if bitwarden_collection_id | default('') %}
+  collection_id: "{{ bitwarden_collection_id }}"
+{% endif %}
+{% endif %}

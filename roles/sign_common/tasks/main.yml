@@ -1,0 +1,28 @@
+---
+- name: Set up the shared sign host (user, packages, GPG keyring)
+  block:
+    - name: Create the sign service user
+      user:
+        name: "{{ service_user }}"
+        groups: wheel
+        append: yes
+        state: present
+        create_home: yes
+        generate_ssh_key: yes
+      become: yes
+
+    - name: Install EPEL repository
+      dnf:
+        name: epel-release
+        state: present
+      become: yes
+
+    - name: Install base packages shared by both sign services
+      dnf:
+        name: "{{ sign_common_packages }}"
+        state: present
+        update_cache: yes
+      become: yes
+
+    - include_tasks: gpg.yml
+...
