@@ -10,8 +10,8 @@ sign_file_repo_version: "main"
 sign_file_working_directory: "/home/{{ service_user }}/albs-sign-file"
 sign_file_venv_directory: "{{ sign_file_working_directory }}/venv"
 
-sign_file_config_dir: "/etc/sign-file"
-sign_file_config_file: "{{ sign_file_config_dir }}/config.yaml"
+sign_file_config_dir: "/home/{{ service_user }}/.config"
+sign_file_config_file: "{{ sign_file_config_dir }}/sign_file.yaml"
 
 # Multi-worker runs need ONE shared Bitwarden session (each worker must not
 # race `bw login`/`bw unlock`). When true, ExecStart establishes the session

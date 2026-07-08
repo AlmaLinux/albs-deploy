@@ -15,6 +15,5 @@
     - separate_sign_node
     # albs-sign-file: standalone HTTP signing API (port 8000).
     - separate_sign_file
-    - { role: ezamriy.fail2ban, fail2ban_ignoreip: '127.0.0.1/8 192.168.0.0/24' }
   connection: "{{ 'local' if use_local_connection else 'ssh' }}"
 ...

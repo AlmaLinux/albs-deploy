@@ -27,7 +27,10 @@
   become: yes
   become_user: "{{ service_user }}"
   ansible.builtin.pip:
-    name: "."
+    # The Bitwarden client (bitwarden-wrapper) is an optional extra in
+    # setup.py; pull it in only when Bitwarden is enabled, else the service
+    # fails at runtime trying to fetch key passphrases.
+    name: "{{ '.[bitwarden]' if (bitwarden_enabled | default(false) | bool) else '.' }}"
     chdir: "{{ sign_file_working_directory }}"
     virtualenv: "{{ sign_file_venv_directory }}"
     virtualenv_command: "python3 -m venv"
