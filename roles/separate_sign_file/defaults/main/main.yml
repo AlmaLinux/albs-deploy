@@ -5,7 +5,7 @@
 # with the system Python 3.9 — never shared with albs-sign-node.
 
 sign_file_repo: "https://github.com/AlmaLinux/albs-sign-file.git"
-sign_file_repo_version: "master"
+sign_file_repo_version: "main"
 
 sign_file_working_directory: "/home/{{ service_user }}/albs-sign-file"
 sign_file_venv_directory: "{{ sign_file_working_directory }}/venv"

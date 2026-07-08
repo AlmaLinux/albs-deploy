@@ -14,7 +14,6 @@
   file:
     path: "{{ item }}"
     state: directory
-    recurse: yes
     owner: "{{ service_user }}"
     group: "{{ service_group }}"
   with_items: "{{ working_directories }}"
@@ -28,6 +27,7 @@
     owner: "{{ service_user }}"
     group: "{{ service_group }}"
     mode: "0644"
+    backup: yes
 
 - name: Clone sign node repository
   become_user: "{{ service_user }}"

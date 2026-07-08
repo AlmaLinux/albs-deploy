@@ -41,6 +41,7 @@
     owner: "{{ service_user }}"
     group: "{{ service_group }}"
     mode: "0640"
+    backup: yes
 
 # Schema setup via alembic (env.py reads settings.db_url from config.yaml).
 # Dev: dev_init also seeds a test user; prod: migrations only. For PostgreSQL

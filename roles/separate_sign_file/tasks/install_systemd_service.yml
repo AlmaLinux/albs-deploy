@@ -6,6 +6,7 @@
     owner: root
     group: root
     mode: "0644"
+    backup: yes
   become: yes
 
 - name: Enable and (re)start the albs-sign-file service
