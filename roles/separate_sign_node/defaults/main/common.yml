@@ -7,20 +7,9 @@ final_conf_dir: "{{ base_conf_dir }}"
 sign_node_working_directory: "{{ home_dir }}/albs"
 sign_node_venv_directory: "{{ sign_node_working_directory }}/venv"
 sign_node_requirements_path: "{{ sign_node_working_directory }}/albs-sign-node/requirements.txt"
-# Pin the immudb/protobuf/google stack to the versions running in production.
-# albs-sign-node's requirements.txt leaves these transitive deps unpinned, so a
-# fresh install pulls protobuf 6 / immudb-py 1.5, whose PEP420 google namespace
-# is shadowed by the bogus `google-api` package immudb-py depends on -> `import
-# google.protobuf` fails at sign-node startup. protobuf 3.20.3 (pkg_resources
-# namespace) tolerates google-api, matching the known-good prod environment.
-# Empty the list to skip pinning (e.g. once fixed upstream in requirements.txt).
-sign_node_dep_pins:
-  - "immudb-py==1.4.0"
-  - "protobuf==3.20.3"
-  - "grpcio==1.69.0"
-  - "googleapis-common-protos==1.61.0"
-  - "google-api-core==2.24.0"
-  - "proto-plus==1.25.0"
+# NOTE: the immudb/protobuf startup breakage is handled in create_env.yml by
+# removing the spurious `google-api` package after install (keeps modern
+# protobuf), not by pinning the dependency stack here.
 working_directories:
   - "{{ base_work_dir }}"
   - "{{ sign_node_working_directory }}"

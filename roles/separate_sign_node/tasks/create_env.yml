@@ -68,16 +68,28 @@
       - rpm
     virtualenv: "{{ sign_node_venv_directory }}"
 
-# Reconcile the immudb/protobuf/google stack to prod's known-good versions
-# (see sign_node_dep_pins in defaults). requirements.txt pulls these unpinned,
-# so this downgrades them to the set that actually imports and signs.
-- name: Pin the immudb/protobuf stack to the known-good production versions
+# immudb-py declares a spurious dependency on the `google-api` PyPI stub, which
+# installs a regular google/__init__.py and shadows the PEP420 `google`
+# namespace, so `import google.protobuf` / `google.api` break at startup.
+# immudb-py never actually imports it, so remove it after install — this keeps
+# modern protobuf working instead of pinning the whole stack to protobuf 3.
+# Runs after every venv rebuild (requirements.txt re-pulls it each time).
+- name: Remove the spurious google-api package (breaks the google namespace)
   become: yes
   become_user: "{{ service_user }}"
-  pip:
-    name: "{{ sign_node_dep_pins }}"
+  ansible.builtin.pip:
+    name: google-api
+    state: absent
     virtualenv: "{{ sign_node_venv_directory }}"
-  when: sign_node_dep_pins | length > 0
+
+# Fail the deploy here (not at service start) if the dependency tree is broken.
+- name: Smoke-test the sign-node import chain
+  become: yes
+  become_user: "{{ service_user }}"
+  ansible.builtin.command: >-
+    {{ sign_node_venv_directory }}/bin/python -c
+    "import google.protobuf, google.api.annotations_pb2, immudb_wrapper"
+  changed_when: false
 
 - name: Add pulp to /etc/hosts
   ansible.builtin.lineinfile:
