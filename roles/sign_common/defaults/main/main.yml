@@ -5,6 +5,14 @@
 service_user: "albs-signer"
 service_group: "albs-signer"
 
+# Both sign services run from the service user's home (/home/<user>/...), which
+# is labeled user_home_t. Under enforcing SELinux, systemd (init_t) cannot exec
+# the venv interpreter or read the config/keyring there, so the services fail to
+# start. Set SELinux permissive on the sign hosts (matches production). Flip to
+# "enforcing" only if the install is ever relocated off /home into a service-
+# friendly context (/srv, /opt).
+sign_common_selinux_state: "permissive"
+
 # Base OS packages needed by both services. Python is the system interpreter
 # (Python 3.9 on AlmaLinux 9); each service builds its OWN venv from it, so no
 # pip/venv work happens in this role.

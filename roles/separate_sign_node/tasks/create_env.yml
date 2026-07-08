@@ -48,6 +48,9 @@
     state: latest
     virtualenv: "{{ sign_node_venv_directory }}"
 
+# Isolated venv (no system site-packages): the system google.* package would
+# otherwise shadow the venv's namespaced google.protobuf (pulled in by
+# immudb_wrapper -> immudb-py), breaking sign-node startup.
 - name: Create venv
   become: yes
   become_user: "{{ service_user }}"
@@ -55,7 +58,6 @@
     virtualenv: "{{ sign_node_venv_directory }}"
     virtualenv_command: "python3 -m venv"
     requirements: "{{ sign_node_requirements_path }}"
-    virtualenv_site_packages: true
 
 - name: Install pycurl in venv
   become: yes
@@ -65,6 +67,17 @@
       - pycurl
       - rpm
     virtualenv: "{{ sign_node_venv_directory }}"
+
+# Reconcile the immudb/protobuf/google stack to prod's known-good versions
+# (see sign_node_dep_pins in defaults). requirements.txt pulls these unpinned,
+# so this downgrades them to the set that actually imports and signs.
+- name: Pin the immudb/protobuf stack to the known-good production versions
+  become: yes
+  become_user: "{{ service_user }}"
+  pip:
+    name: "{{ sign_node_dep_pins }}"
+    virtualenv: "{{ sign_node_venv_directory }}"
+  when: sign_node_dep_pins | length > 0
 
 - name: Add pulp to /etc/hosts
   ansible.builtin.lineinfile:
