@@ -1,0 +1,34 @@
+---
+- name: Set up the shared sign host (user, packages, GPG keyring)
+  block:
+    - name: Set SELinux state (services run from /home; enforcing blocks them)
+      ansible.posix.selinux:
+        policy: targeted
+        state: "{{ sign_common_selinux_state }}"
+      become: yes
+
+    - name: Create the sign service user
+      user:
+        name: "{{ service_user }}"
+        groups: wheel
+        append: yes
+        state: present
+        create_home: yes
+        generate_ssh_key: yes
+      become: yes
+
+    - name: Install EPEL repository
+      dnf:
+        name: epel-release
+        state: present
+      become: yes
+
+    - name: Install base packages shared by both sign services
+      dnf:
+        name: "{{ sign_common_packages }}"
+        state: present
+        update_cache: yes
+      become: yes
+
+    - include_tasks: gpg.yml
+...

@@ -1,0 +1,19 @@
+---
+- name: Deploy ALBS sign hosts (sign-node + sign-file, co-located)
+  hosts: sign_nodes
+  roles:
+    # Shared prerequisites: service user, base packages, and the host's
+    # GnuPG keyring resolved into the `gpg_keys` fact. Must run first — both
+    # service roles below consume that fact.
+    - sign_common
+    # Bitwarden CLI (prod passphrase source), configured for the service user.
+    - role: bitwarden_cli
+      when: bitwarden_enabled | default(false) | bool
+      vars:
+        bitwarden_cli_config_user: "{{ service_user }}"
+    # albs-sign-node: signs build artifacts pulled from the ALBS master.
+    - separate_sign_node
+    # albs-sign-file: standalone HTTP signing API (port 8000).
+    - separate_sign_file
+  connection: "{{ 'local' if use_local_connection else 'ssh' }}"
+...

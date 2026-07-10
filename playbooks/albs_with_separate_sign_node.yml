@@ -10,6 +10,11 @@
 - name: Deploy the separate sign node of ALBS
   hosts: sign_node_vm
   roles:
+    - sign_common
+    - role: bitwarden_cli
+      when: bitwarden_enabled | default(false) | bool
+      vars:
+        bitwarden_cli_config_user: "{{ service_user }}"
     - separate_sign_node
     - { role: ezamriy.fail2ban, fail2ban_ignoreip: '127.0.0.1/8 192.168.0.0/24' }
   tags:

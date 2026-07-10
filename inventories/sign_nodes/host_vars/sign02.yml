@@ -1,0 +1,10 @@
+---
+ansible_host: 10.0.0.12
+
+# A DIFFERENT key from sign01 — each host has its own signing identity.
+pgp_keys:
+  - "A1B2C3D4E5F60789"
+
+# gpg_import_keys:
+#   - files/keys/sign02-private.asc
+...

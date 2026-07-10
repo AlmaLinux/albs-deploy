@@ -6,6 +6,7 @@
     group: "root"
     owner: "root"
     mode: "0644"
+    backup: yes
   become: "yes"
 
 - name: Enable and start build node systemd service

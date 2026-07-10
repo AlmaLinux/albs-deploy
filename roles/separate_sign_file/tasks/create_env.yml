@@ -1,0 +1,65 @@
+---
+# System packages (gpg2, pinentry, python3, gcc, git) and the service user are
+# provided by the sign_common role, which must run before this one.
+
+- name: Create the sign-file config directory
+  ansible.builtin.file:
+    path: "{{ sign_file_config_dir }}"
+    state: directory
+    owner: "{{ service_user }}"
+    group: "{{ service_group }}"
+    mode: "0750"
+  become: yes
+
+- name: Clone the albs-sign-file repository
+  become: yes
+  become_user: "{{ service_user }}"
+  ansible.builtin.git:
+    repo: "{{ sign_file_repo }}"
+    dest: "{{ sign_file_working_directory }}"
+    version: "{{ sign_file_repo_version }}"
+    clone: yes
+    update: yes
+    accept_hostkey: yes
+    force: yes
+
+- name: Create the sign-file venv and install the package (system python3.9)
+  become: yes
+  become_user: "{{ service_user }}"
+  ansible.builtin.pip:
+    # The Bitwarden client (bitwarden-wrapper) is an optional extra in
+    # setup.py; pull it in only when Bitwarden is enabled, else the service
+    # fails at runtime trying to fetch key passphrases.
+    name: "{{ '.[bitwarden]' if (bitwarden_enabled | default(false) | bool) else '.' }}"
+    chdir: "{{ sign_file_working_directory }}"
+    virtualenv: "{{ sign_file_venv_directory }}"
+    virtualenv_command: "python3 -m venv"
+
+- name: Render the sign-file config.yaml
+  become: yes
+  become_user: "{{ service_user }}"
+  ansible.builtin.template:
+    src: config.yaml.j2
+    dest: "{{ sign_file_config_file }}"
+    owner: "{{ service_user }}"
+    group: "{{ service_group }}"
+    mode: "0640"
+    backup: yes
+
+# Schema setup via alembic (env.py reads settings.db_url from config.yaml).
+# Dev: dev_init also seeds a test user; prod: migrations only. For PostgreSQL
+# the database and role must already exist — this only creates the schema.
+# Both commands are idempotent (alembic upgrade head; dev user creation is
+# guarded), so they are safe to run on every deploy.
+- name: Initialize / upgrade the sign-file database schema
+  become: yes
+  become_user: "{{ service_user }}"
+  environment:
+    SF_CONFIG_FILE: "{{ sign_file_config_file }}"
+  ansible.builtin.command: >-
+    {{ sign_file_venv_directory }}/bin/python3 db_manage.py
+    {{ 'dev_init' if (sign_dev_mode | bool) else 'migrate_upgrade' }}
+  args:
+    chdir: "{{ sign_file_working_directory }}"
+  changed_when: true
+...

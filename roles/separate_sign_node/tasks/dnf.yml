@@ -10,12 +10,6 @@
     dest: /etc/yum.repos.d/signnode.repo
   become: "yes"
 
-- name: Download codenotary.repo to /etc/yum.repos.d/
-  get_url:
-    url: https://packages.codenotary.org/codenotary.repo
-    dest: /etc/yum.repos.d/codenotary.repo
-  become: "yes"
-
 - name: Install epel repository
   dnf:
     name: "epel-release"
@@ -30,7 +24,6 @@
       - powertools
       - epel
       - signnode
-      - codenotary-repo
     update_cache: yes
   become: "yes"
 ...

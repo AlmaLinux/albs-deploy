@@ -1,0 +1,86 @@
+---
+- name: Require a Bitwarden server URL
+  ansible.builtin.assert:
+    that:
+      - bitwarden_url | length > 0
+    fail_msg: "bitwarden_cli role included but bitwarden_url is not set."
+
+- name: Install unzip (needed to unpack the CLI archive)
+  ansible.builtin.dnf:
+    name: unzip
+    state: present
+  become: yes
+
+- name: Download and unpack the Bitwarden CLI onto PATH
+  ansible.builtin.unarchive:
+    src: "{{ bitwarden_cli_url }}"
+    dest: "{{ bitwarden_cli_install_dir }}"
+    remote_src: yes
+    creates: "{{ bitwarden_cli_install_dir }}/bw"
+  become: yes
+
+- name: Ensure the bw binary is executable for all users
+  ansible.builtin.file:
+    path: "{{ bitwarden_cli_install_dir }}/bw"
+    owner: root
+    group: root
+    mode: "0755"
+  become: yes
+
+- name: Install the bw-ensure-session helper onto PATH
+  ansible.builtin.copy:
+    src: bw-ensure-session.sh
+    dest: "{{ bitwarden_cli_install_dir }}/bw-ensure-session"
+    owner: root
+    group: root
+    mode: "0755"
+  become: yes
+
+# `bw config server` (no url) prints the currently configured server. Read it
+# first: the CLI refuses "config server" while logged in ("Logout required
+# before server config update"), so on a re-run we must skip the set when the
+# server is already correct.
+- name: Read the currently configured Bitwarden server
+  become: yes
+  become_user: "{{ bitwarden_cli_config_user }}"
+  ansible.builtin.command: "{{ bitwarden_cli_install_dir }}/bw config server"
+  register: bw_current_server
+  changed_when: false
+  failed_when: false
+
+- name: Point the Bitwarden CLI at the server
+  become: yes
+  become_user: "{{ bitwarden_cli_config_user }}"
+  ansible.builtin.command: "{{ bitwarden_cli_install_dir }}/bw config server {{ bitwarden_url }}"
+  register: bw_config_server
+  changed_when: "'Saved' in (bw_config_server.stdout | default(''))"
+  when: bitwarden_url not in (bw_current_server.stdout | default(''))
+
+# Materialize the master password so `bw login/unlock --passwordfile` (and the
+# service configs) can read it. Skipped when bitwarden_master_password is empty
+# — then the file is expected to be provisioned out-of-band.
+#
+# This role runs before the service roles that create the config dir, and copy
+# does not create parents, so ensure the directory exists first. mode matches
+# the service roles' 0750 to stay idempotent across runs.
+- name: Ensure the directory for the Bitwarden password file exists
+  become: yes
+  ansible.builtin.file:
+    path: "{{ bitwarden_password_file | dirname }}"
+    state: directory
+    owner: "{{ bitwarden_cli_config_user }}"
+    group: "{{ bitwarden_cli_config_user }}"
+    mode: "0750"
+  when: bitwarden_master_password | length > 0
+
+- name: Write the Bitwarden master password file
+  become: yes
+  ansible.builtin.copy:
+    content: "{{ bitwarden_master_password }}"
+    dest: "{{ bitwarden_password_file }}"
+    owner: "{{ bitwarden_cli_config_user }}"
+    group: "{{ bitwarden_cli_config_user }}"
+    mode: "0600"
+  no_log: yes
+  when: bitwarden_master_password | length > 0
+...

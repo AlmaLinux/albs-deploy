@@ -7,12 +7,15 @@ final_conf_dir: "{{ base_conf_dir }}"
 sign_node_working_directory: "{{ home_dir }}/albs"
 sign_node_venv_directory: "{{ sign_node_working_directory }}/venv"
 sign_node_requirements_path: "{{ sign_node_working_directory }}/albs-sign-node/requirements.txt"
+# NOTE: the immudb/protobuf startup breakage is handled in create_env.yml by
+# removing the spurious `google-api` package after install (keeps modern
+# protobuf), not by pinning the dependency stack here.
 working_directories:
   - "{{ base_work_dir }}"
   - "{{ sign_node_working_directory }}"
   - "{{ sign_node_venv_directory }}"
   - "{{ base_work_dir }}/sign_node"
   - "{{ final_conf_dir }}"
-service_group: "alt"
-service_user: "alt"
+service_group: "albs-signer"
+service_user: "albs-signer"
 ...

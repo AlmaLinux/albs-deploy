@@ -1,13 +1,6 @@
 ---
-- name: Create service user
-  user:
-    name: "{{ service_user }}"
-    groups: wheel
-    append: yes
-    state: present
-    create_home: yes
-    generate_ssh_key: yes
-  become: "yes"
+# The service user and the GnuPG keyring (the `gpg_keys` fact used below) are
+# provisioned by the sign_common role, which must run before this one.
 
 - name: Remove venv if exists
   file:
@@ -21,43 +14,9 @@
   file:
     path: "{{ item }}"
     state: directory
-    recurse: yes
     owner: "{{ service_user }}"
     group: "{{ service_group }}"
   with_items: "{{ working_directories }}"
-
-- name: Get already existing GPG key's fingerprint
-  become_user: "{{ service_user }}"
-  become: "yes"
-  shell: "gpg --list-keys test@albs.local | head -n 2 | tail -1"
-  register: gpg_key_fingerprint
-
-- name: Generate a GPG scenario
-  become_user: "{{ service_user }}"
-  become: "yes"
-  template:
-    dest: "{{ gpg_key_scenario.dest }}/{{ gpg_key_scenario.name }}"
-    src: "{{ gpg_key_scenario.name }}.j2"
-    owner: "{{ gpg_key_scenario.owner }}"
-    mode: "{{ gpg_key_scenario.mode }}"
-    force: yes
-
-- name: Generate GPG key
-  become_user: "{{ service_user }}"
-  become: "yes"
-  shell: "gpg --batch --gen-key {{ gpg_key_scenario.dest }}/{{ gpg_key_scenario.name }}"
-  when: gpg_key_fingerprint.stdout == ""
-
-- name: Get already existing GPG key's fingerprint
-  become_user: "{{ service_user }}"
-  become: "yes"
-  shell: "gpg --list-keys test@albs.local | head -n 2 | tail -1"
-  register: gpg_key_fingerprint
-
-- name: Set GPG key
-  set_fact:
-    gpg_keys:
-      - "{{ gpg_key_fingerprint.stdout[-16:] }}"
 
 - name: Generate sign node config
   become_user: "{{ service_user }}"
@@ -68,6 +27,7 @@
     owner: "{{ service_user }}"
     group: "{{ service_group }}"
     mode: "0644"
+    backup: yes
 
 - name: Clone sign node repository
   become_user: "{{ service_user }}"
@@ -88,6 +48,9 @@
     state: latest
     virtualenv: "{{ sign_node_venv_directory }}"
 
+# Isolated venv (no system site-packages): the system google.* package would
+# otherwise shadow the venv's namespaced google.protobuf (pulled in by
+# immudb_wrapper -> immudb-py), breaking sign-node startup.
 - name: Create venv
   become: yes
   become_user: "{{ service_user }}"
@@ -95,7 +58,6 @@
     virtualenv: "{{ sign_node_venv_directory }}"
     virtualenv_command: "python3 -m venv"
     requirements: "{{ sign_node_requirements_path }}"
-    virtualenv_site_packages: true
 
 - name: Install pycurl in venv
   become: yes
@@ -105,6 +67,29 @@
       - pycurl
       - rpm
     virtualenv: "{{ sign_node_venv_directory }}"
+
+# immudb-py declares a spurious dependency on the `google-api` PyPI stub, which
+# installs a regular google/__init__.py and shadows the PEP420 `google`
+# namespace, so `import google.protobuf` / `google.api` break at startup.
+# immudb-py never actually imports it, so remove it after install — this keeps
+# modern protobuf working instead of pinning the whole stack to protobuf 3.
+# Runs after every venv rebuild (requirements.txt re-pulls it each time).
+- name: Remove the spurious google-api package (breaks the google namespace)
+  become: yes
+  become_user: "{{ service_user }}"
+  ansible.builtin.pip:
+    name: google-api
+    state: absent
+    virtualenv: "{{ sign_node_venv_directory }}"
+
+# Fail the deploy here (not at service start) if the dependency tree is broken.
+- name: Smoke-test the sign-node import chain
+  become: yes
+  become_user: "{{ service_user }}"
+  ansible.builtin.command: >-
+    {{ sign_node_venv_directory }}/bin/python -c
+    "import google.protobuf, google.api.annotations_pb2, immudb_wrapper"
+  changed_when: false
 
 - name: Add pulp to /etc/hosts
   ansible.builtin.lineinfile:

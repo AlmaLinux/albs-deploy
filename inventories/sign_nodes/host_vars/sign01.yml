@@ -1,0 +1,14 @@
+---
+ansible_host: 10.0.0.11
+
+# This host's signing key(s), as 16-char key ids. Authoritative when set —
+# both albs-sign-node and albs-sign-file on this host sign with these.
+pgp_keys:
+  - "7C3955C2A345DA89"
+
+# Optional: private key files on the control node to import into this host's
+# keyring before signing. Omit to rely on a key already present, or on
+# auto-generation (sign_generate_gpg_key).
+# gpg_import_keys:
+#   - files/keys/sign01-private.asc
+...
