@@ -165,19 +165,14 @@ workers) are deployed by separate playbooks using the `inventories/alts`
 inventory. Copy it, put your hosts into `hosts.yml` and adjust
 `group_vars/*.yml` (passwords, JWT secret, Pulp credentials, etc.).
 
-TLS certificates and keys are not stored in the repository. Put them into
-`playbooks/files/alts/` (gitignored):
-```
-playbooks/files/alts/celery/{ca_certificate,client_certificate,client_key}.pem
-playbooks/files/alts/rabbitmq/{ca_certificate,server_certificate,server_key}.pem
-```
-
-Then run the playbooks in order:
+TLS certificates and keys for RabbitMQ and Celery are stored encrypted
+with Ansible Vault in `playbooks/files/alts/{celery,rabbitmq}/`, so the
+playbooks need the vault password:
 ```bash
 ansible-galaxy install -r requirements.yml
-ansible-playbook -i inventories/alts playbooks/alts_rabbitmq.yml
-ansible-playbook -i inventories/alts playbooks/alts_scheduler.yml -e flower_password=<password>
-ansible-playbook -i inventories/alts playbooks/alts_celery.yml
+ansible-playbook -i inventories/alts --ask-vault-pass playbooks/alts_rabbitmq.yml
+ansible-playbook -i inventories/alts --ask-vault-pass playbooks/alts_scheduler.yml -e flower_password=<password>
+ansible-playbook -i inventories/alts --ask-vault-pass playbooks/alts_celery.yml
 ```
 
 ## Contributing to albs-deploy
