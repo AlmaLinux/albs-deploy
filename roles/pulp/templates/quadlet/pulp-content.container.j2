@@ -1,0 +1,46 @@
+# {{ ansible_managed }}
+# pulp-content gunicorn. Publishes its gunicorn port for the external reverse
+# proxy, which MUST route /pulp/content/ here and everything else to the api port.
+# Single-instance for the same fixed-host-port reason as pulp-api.
+[Unit]
+Description=Pulp content service
+Requires={{ pulp_quadlet_runtime_after | join(' ') }}
+After={{ pulp_quadlet_runtime_after | join(' ') }}
+{% if pulp_quadlet_runtime_mounts %}
+RequiresMountsFor={{ pulp_quadlet_runtime_mounts | join(' ') }}
+{% endif %}
+
+[Container]
+ContainerName=pulp-content
+Image={{ pulp_runtime_image }}
+Network={{ pulp_quadlet_network_name }}.network
+HostName=pulp-content
+Exec=pulp-content
+PublishPort={{ pulp_content_host_port }}:24816
+Environment=PULP_CONTENT_WORKERS={{ pulp_content_workers }}
+Environment=PULP_GUNICORN_TIMEOUT={{ pulp_gunicorn_timeout }}
+{% if pulp_otel_enabled | bool %}
+Environment=PULP_OTEL_ENABLED=true
+Environment=OTEL_EXPORTER_OTLP_ENDPOINT={{ pulp_otel_exporter_endpoint }}
+Environment=OTEL_EXPORTER_OTLP_PROTOCOL={{ pulp_otel_exporter_protocol }}
+Environment=OTEL_SERVICE_NAME=pulp-content
+{% endif %}
+{% for vol in pulp_quadlet_runtime_volumes %}
+Volume={{ vol }}
+{% endfor %}
+LogDriver={{ pulp_log_driver }}
+PodmanArgs=--user {{ pulp_run_user }}{% if pulp_log_driver == 'journald' %} --log-opt tag=pulp_content{% endif %}
+
+# Informational only — see the note in pulp-api.container.j2.
+HealthCmd=readyz.py /pulp/content/
+HealthInterval=10s
+HealthTimeout=5s
+HealthRetries=5
+HealthStartPeriod=90s
+
+[Service]
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

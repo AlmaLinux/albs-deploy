@@ -1,0 +1,14 @@
+# {{ ansible_managed }}
+# Dedicated bridge network for the Pulp stack.
+#
+# This unit is MANDATORY, not cosmetic. Podman's built-in "podman" network has
+# DNS DISABLED — a container that omits Network= lands there, cannot resolve
+# "redis", and pulp-api/content/worker fail to reach the cache/broker. compose
+# hid this by always creating a project network. Quadlet-created networks have
+# DNS (aardvark-dns) on by default, which is what makes ContainerName= usable as
+# a hostname across the stack.
+[Unit]
+Description=Pulp container network
+
+[Network]
+NetworkName={{ pulp_quadlet_network_name }}

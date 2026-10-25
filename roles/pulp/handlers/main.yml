@@ -1,0 +1,122 @@
+---
+# Recreate/restart containers so changed config (settings.py, nginx, compose file
+# or Quadlet units) and freshly built images are picked up. Mounted files are only
+# re-read on container restart.
+#
+# Every asset task notifies "Restart Pulp stack"; the handlers below all listen on
+# that name and are guarded by pulp_orchestrator, so exactly one path runs. Handler
+# order is definition order, which is why the daemon-reload comes before the unit
+# restart — a newly rendered .container file does not exist as a systemd unit until
+# the generator has run.
+
+# ── Quadlet ────────────────────────────────────────────────────────────────
+- name: Reload systemd so Quadlet regenerates the units
+  ansible.builtin.systemd:
+    daemon_reload: true
+  listen:
+    - Restart Pulp stack
+    - Restart Pulp data stores
+    - Restart Pulp collector
+  when: pulp_orchestrator == 'quadlet'
+
+# Data-store units (postgres/redis, their volumes, the shared network) mount none
+# of the rendered config assets, so a settings.py change deliberately leaves them
+# alone. But a change to one of THEIR unit files — image bump, exposed port,
+# volume swap — has to be applied, and a daemon-reload alone does not restart a
+# running service. Only the render tasks for those units notify this topic.
+- name: Restart the Pulp data-store services
+  ansible.builtin.systemd:
+    name: "{{ item }}"
+    state: restarted
+  loop: "{{ pulp_quadlet_datastore_units }}"
+  listen: Restart Pulp data stores
+  when:
+    - pulp_orchestrator == 'quadlet'
+    - pulp_start_stack | bool
+
+# ── Compose ────────────────────────────────────────────────────────────────
+- name: Restart Pulp stack
+  ansible.builtin.command:
+    cmd: >-
+      {{ pulp_compose_cmd }} -f compose.yml up -d --force-recreate --remove-orphans
+      --scale pulp_api={{ pulp_api_replicas }}
+      --scale pulp_content={{ pulp_content_replicas }}
+      --scale pulp_worker={{ pulp_worker_replicas }}
+    chdir: "{{ pulp_project_dir }}"
+  changed_when: true
+  when:
+    - pulp_orchestrator == 'compose'
+    - pulp_start_stack | bool
+
+# Re-run the schema migration BEFORE the services that depend on it restart.
+#
+# pulp-migration is Type=oneshot + RemainAfterExit=yes, so it stays
+# "active (exited)" and the `state: started` task in main.yml is a no-op on it.
+# Without this handler an image-tag bump would restart api/content/worker onto the
+# NEW code against the OLD schema — the compose path avoids that because
+# `up -d --force-recreate` recreates migration_service. `migrate` with nothing
+# pending is a cheap no-op, so running it on every config change is safe.
+#
+# Deliberately NOT restarting pulp-init-password: re-running that resets the
+# admin password. Signing registration is left alone for the same
+# don't-touch-it-unless-asked reason.
+#
+# Ordering matters and is why this sits above the runtime restart: api/content/
+# worker carry Requires=pulp-migration.service, so if systemd propagates the
+# deactivation to them, the next handler brings them straight back up.
+- name: Re-run the Pulp database migration
+  ansible.builtin.systemd:
+    name: pulp-migration.service
+    state: restarted
+  listen: Restart Pulp stack
+  when:
+    - pulp_orchestrator == 'quadlet'
+    - pulp_start_stack | bool
+
+# Restart only the services that mount the changed config — not the whole stack.
+# Redis mounts none of it and the one-shots have already completed, so leaving
+# them alone avoids a needless cache flush and a re-run of `migrate` on every
+# config tweak. (This granularity is the main day-2 win over the compose path,
+# which force-recreates every container including the data stores.)
+- name: Restart the Pulp Quadlet services
+  ansible.builtin.systemd:
+    name: "{{ item }}"
+    state: restarted
+  loop: "{{ pulp_quadlet_runtime_units }}"
+  listen: Restart Pulp stack
+  when:
+    - pulp_orchestrator == 'quadlet'
+    - pulp_start_stack | bool
+
+# ── Telemetry ──────────────────────────────────────────────────────────────
+# The collector config is mounted into the collector only, so restart just that
+# container. Both orchestrator paths are guarded, so exactly one runs.
+- name: Restart the OpenTelemetry collector (compose)
+  ansible.builtin.command:
+    cmd: >-
+      {{ pulp_compose_cmd }} -f compose.yml up -d --force-recreate
+      {{ pulp_otel_collector_name }}
+    chdir: "{{ pulp_project_dir }}"
+  changed_when: true
+  listen: Restart Pulp collector
+  when:
+    - pulp_orchestrator == 'compose'
+    - pulp_otel_collector_enabled | bool
+    - pulp_start_stack | bool
+
+- name: Restart the OpenTelemetry collector (Quadlet)
+  ansible.builtin.systemd:
+    name: otel-collector.service
+    state: restarted
+  listen: Restart Pulp collector
+  when:
+    - pulp_orchestrator == 'quadlet'
+    - pulp_otel_collector_enabled | bool
+    - pulp_start_stack | bool
+
+# journald re-reads its config on restart. Safe: it hands sockets off across the
+# restart, so no log entries are dropped.
+- name: Restart systemd-journald
+  ansible.builtin.systemd:
+    name: systemd-journald
+    state: restarted

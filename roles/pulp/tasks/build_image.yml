@@ -1,0 +1,62 @@
+---
+- name: Assert the vendored source patches match the image pulpcore version
+  ansible.builtin.assert:
+    that: pulp_image_tag == pulp_source_patches_pulpcore_version
+    fail_msg: >-
+      The vendored pulpcore source patches
+      ({{ pulp_source_patches | map(attribute='src') | join(', ') }} under
+      roles/pulp/files/) are pinned to pulpcore
+      {{ pulp_source_patches_pulpcore_version }} but the image tag is
+      {{ pulp_image_tag }}. Each patch vendors a WHOLE module, so they are very
+      likely stale against the new version. Re-derive every file from the
+      {{ pulp_image_tag }} upstream, set pulp_source_patches_pulpcore_version to
+      {{ pulp_image_tag }}, or disable pulp_source_patches_enabled.
+  when: pulp_source_patches_enabled | bool
+
+- name: Ensure the patches directory exists in the build context
+  ansible.builtin.file:
+    path: "{{ pulp_project_dir }}/patches"
+    state: directory
+    mode: "0755"
+  when: pulp_source_patches_enabled | bool
+
+- name: Stage the vendored source patches into the build context
+  ansible.builtin.copy:
+    src: "{{ item.src }}"
+    dest: "{{ pulp_project_dir }}/patches/{{ item.src }}"
+    mode: "0644"
+  loop: "{{ pulp_source_patches }}"
+  loop_control:
+    label: "{{ item.src }}"
+  register: pulp_source_patches_staged
+  when: pulp_source_patches_enabled | bool
+
+- name: Render the custom-image Containerfile
+  ansible.builtin.template:
+    src: Containerfile.j2
+    dest: "{{ pulp_project_dir }}/Containerfile"
+    mode: "0644"
+  register: pulp_containerfile
+
+- name: Check whether the custom image already exists
+  ansible.builtin.command:
+    cmd: "{{ pulp_container_cli }} image inspect {{ pulp_custom_image_name }}"
+  register: pulp_image_present
+  changed_when: false
+  failed_when: false
+
+- name: Pull the latest pulp-minimal base image
+  ansible.builtin.command:
+    cmd: "{{ pulp_container_cli }} pull {{ pulp_minimal_image }}"
+  register: pulp_base_pull
+  changed_when: "'Downloaded newer image' in pulp_base_pull.stdout"
+  when: pulp_containerfile is changed or pulp_image_present.rc != 0 or pulp_source_patches_staged is changed
+
+- name: Build the custom Pulp image
+  ansible.builtin.command:
+    cmd: "{{ pulp_container_cli }} build --pull -t {{ pulp_custom_image_name }} -f Containerfile ."
+    chdir: "{{ pulp_project_dir }}"
+  register: pulp_image_build
+  changed_when: true
+  when: pulp_containerfile is changed or pulp_image_present.rc != 0 or pulp_source_patches_staged is changed
+  notify: Restart Pulp stack

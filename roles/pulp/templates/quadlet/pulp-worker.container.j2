@@ -1,0 +1,46 @@
+# {{ ansible_managed }}
+# Pulp task worker {{ worker_index }} of {{ pulp_worker_replicas }}.
+#
+# One concrete unit per replica rather than a systemd template unit
+# (pulp-worker@.container): Quadlet-generated units live in the systemd generator
+# directory, so `systemctl enable pulp-worker@N` has nothing to symlink and boot
+# persistence has to come from [Install] WantedBy= inside the file — which a
+# template cannot express per instance. Rendering N files keeps enablement
+# declarative; quadlet.yml prunes units above the current replica count.
+#
+# Workers publish no port, so they scale freely by replica count (unlike
+# api/content). This replaces the old pulpcore-worker@1..N systemd units.
+[Unit]
+Description=Pulp task worker {{ worker_index }}
+Requires={{ pulp_quadlet_runtime_after | join(' ') }}
+After={{ pulp_quadlet_runtime_after | join(' ') }}
+{% if pulp_quadlet_runtime_mounts %}
+RequiresMountsFor={{ pulp_quadlet_runtime_mounts | join(' ') }}
+{% endif %}
+
+[Container]
+ContainerName=pulp-worker-{{ worker_index }}
+Image={{ pulp_runtime_image }}
+Network={{ pulp_quadlet_network_name }}.network
+Exec=pulp-worker
+{% if pulp_otel_enabled | bool %}
+Environment=PULP_OTEL_ENABLED=true
+Environment=OTEL_EXPORTER_OTLP_ENDPOINT={{ pulp_otel_exporter_endpoint }}
+Environment=OTEL_EXPORTER_OTLP_PROTOCOL={{ pulp_otel_exporter_protocol }}
+Environment=OTEL_SERVICE_NAME=pulp-worker
+{% endif %}
+{% for vol in pulp_quadlet_runtime_volumes %}
+Volume={{ vol }}
+{% endfor %}
+LogDriver={{ pulp_log_driver }}
+{# Static tag shared by every replica, so `journalctl -t pulp_worker` aggregates
+   all of them while journald's CONTAINER_NAME still separates each one. #}
+PodmanArgs=--user {{ pulp_run_user }}{% if pulp_log_driver == 'journald' %} --log-opt tag=pulp_worker{% endif %}
+
+
+[Service]
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

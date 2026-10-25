@@ -175,6 +175,22 @@ ansible-playbook -i inventories/alts --ask-vault-pass playbooks/alts_scheduler.y
 ansible-playbook -i inventories/alts --ask-vault-pass playbooks/alts_celery.yml
 ```
 
+## Pulp (standalone deployment)
+Pulp is deployed by `playbooks/pulp.yml` (role `roles/pulp`) using the
+`inventories/pulp` inventory, which has `dev`, `staging` and `prod` groups.
+Put your hosts into `hosts.yml` and adjust `group_vars/*.yml`; all tunables
+are documented in `roles/pulp/defaults/main.yml`.
+
+Secrets are never committed. Provide `pulp_postgres_password` and
+`pulp_secret_key` (and `pulp_admin_password` where used) via
+`ansible-vault encrypt_string` or a separate vault file passed with `-e @...`.
+For an existing deployment, drop the original `database_fields.symmetric.key`
+and `token_{public,private}_key.pem` into `roles/pulp/files/` (gitignored).
+```bash
+ansible-playbook -i inventories/pulp playbooks/pulp.yml --limit dev
+ansible-playbook -i inventories/pulp playbooks/pulp.yml --limit prod --ask-vault-pass
+```
+
 ## Contributing to albs-deploy
 Any question? Found a bug? File an [issue](https://github.com/AlmaLinux/build-system/issues).
 Do you want to contribute with source code?

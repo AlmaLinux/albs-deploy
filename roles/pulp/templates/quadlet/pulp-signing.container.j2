@@ -1,0 +1,31 @@
+# {{ ansible_managed }}
+# One-shot: register the Pulp signing service. Requires the GPG key identified by
+# pulp_signing_key_fingerprint to already be in the pulp keyring — otherwise this
+# unit fails and, because api/content/worker order After= it, the stack stays down.
+[Unit]
+Description=Pulp signing service registration (one-shot)
+Requires=pulp-migration.service
+After=pulp-migration.service
+{% if pulp_quadlet_runtime_mounts %}
+RequiresMountsFor={{ pulp_quadlet_runtime_mounts | join(' ') }}
+{% endif %}
+
+[Container]
+ContainerName=pulp-signing
+Image={{ pulp_runtime_image }}
+Network={{ pulp_quadlet_network_name }}.network
+Exec=sh -c "add_signing_service.sh"
+Environment=PULP_SIGNING_KEY_FINGERPRINT={{ pulp_signing_key_fingerprint }}
+{% for vol in pulp_quadlet_runtime_volumes %}
+Volume={{ vol }}
+{% endfor %}
+LogDriver={{ pulp_log_driver }}
+PodmanArgs=--user {{ pulp_run_user }}{% if pulp_log_driver == 'journald' %} --log-opt tag=pulp_signing{% endif %}
+
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

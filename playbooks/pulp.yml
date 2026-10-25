@@ -1,0 +1,15 @@
+---
+# Deploy Pulp via Docker Compose or Podman (pulp_container_engine), following
+# the upstream pulp-oci-images quickstart (scalable multi-container topology),
+# with optional custom-image builds to add plugins beyond the bundled set.
+#
+# Usage:
+#   ansible-playbook -i inventories/pulp playbooks/pulp.yml --limit dev
+#   ansible-playbook -i inventories/pulp playbooks/pulp.yml --limit prod --ask-vault-pass
+#
+- name: Deploy Pulp
+  hosts: pulp_all
+  gather_facts: true
+  become: true
+  roles:
+    - role: pulp

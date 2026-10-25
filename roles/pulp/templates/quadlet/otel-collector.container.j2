@@ -1,0 +1,56 @@
+# {{ ansible_managed }}
+# OpenTelemetry Collector for the Pulp stack. Receives OTLP from
+# pulp-api / pulp-content / pulp-worker-N and forwards per
+# {{ pulp_assets_dir }}/otel/config.yaml.
+#
+# ContainerName is the DNS name aardvark-dns serves on the pulp network, and it
+# must match the host part of pulp_otel_exporter_endpoint. Network= is therefore
+# mandatory: on podman's built-in network DNS is disabled and Pulp could not
+# resolve this name.
+#
+# NOTHING orders itself after this unit, deliberately. Telemetry is best-effort:
+# a broken collector must not keep Pulp down, and the OTLP exporters retry by
+# themselves. Hence no entry in pulp_quadlet_runtime_after and no Requires= on
+# this service anywhere.
+[Unit]
+Description=OpenTelemetry Collector for Pulp
+
+[Container]
+ContainerName={{ pulp_otel_collector_name }}
+Image={{ pulp_otel_collector_image }}
+Network={{ pulp_quadlet_network_name }}.network
+{# The -contrib image reads /etc/otelcol-contrib/config.yaml; the core
+   (non-contrib) image reads /etc/otelcol/config.yaml. Pinned together with
+   pulp_otel_collector_image — change both or the collector starts with its
+   built-in default config and silently drops everything. #}
+{# Mount options are COMMA-separated after the third colon, so the relabel flag
+   has to join "ro" with a comma — ":ro:z" is a fourth field and is rejected. #}
+Volume={{ pulp_assets_dir }}/otel/config.yaml:/etc/otelcol-contrib/config.yaml:ro{{ _pulp_z | replace(':', ',') }}
+{% if pulp_otel_collector_expose_ports | bool %}
+{# OTLP ingest. Only needed to push data in from OUTSIDE the container network —
+   Pulp itself reaches the collector by DNS on the shared network. #}
+PublishPort={{ pulp_otel_collector_otlp_http_port }}:{{ pulp_otel_collector_otlp_http_port }}
+PublishPort={{ pulp_otel_collector_otlp_grpc_port }}:{{ pulp_otel_collector_otlp_grpc_port }}
+{% endif %}
+{% if pulp_otel_collector_prometheus_exporter | bool %}
+{# Scrape endpoint. Published unconditionally when the exporter is on: Prometheus
+   lives outside the container network, so an unpublished port is useless. #}
+PublishPort={{ pulp_otel_collector_prometheus_port }}:{{ pulp_otel_collector_prometheus_port }}
+{% endif %}
+{% if pulp_otel_collector_telemetry_enabled | bool %}
+PublishPort={{ pulp_otel_collector_telemetry_port }}:{{ pulp_otel_collector_telemetry_port }}
+{% endif %}
+LogDriver={{ pulp_log_driver }}
+{% if pulp_log_driver == 'journald' %}
+PodmanArgs=--log-opt tag=otel_collector
+{% endif %}
+# No HealthCmd / Notify=healthy: the collector image ships no shell or curl, so
+# there is nothing to probe with — and since nothing orders itself after this
+# unit, there is no dependent whose start would need gating.
+
+[Service]
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

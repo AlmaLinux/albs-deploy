@@ -1,0 +1,48 @@
+# {{ ansible_managed }}
+# One-shot database migration. Runs `pulpcore-manager migrate` against the
+# external PostgreSQL before any long-lived service starts.
+#
+# Type=oneshot + RemainAfterExit=yes makes Quadlet run the container in the
+# foreground and keeps the unit "active (exited)" after success, so an After= on
+# this unit means "after the migration COMPLETED" — compose's
+# condition: service_completed_successfully.
+#
+# WARNING: on an image-tag bump this performs a real, FORWARD-ONLY schema
+# upgrade. Snapshot the database first.
+[Unit]
+Description=Pulp database migration (one-shot)
+{% if not (pulp_postgres_external | bool) %}
+# Local database: wait for it to be ACCEPTING CONNECTIONS, not merely started.
+# pulp-postgres carries Notify=healthy (pg_isready), so this After= covers initdb
+# on a first bring-up. With an external database there is no unit to order
+# against — the DB is assumed up, exactly as in the compose rendering.
+Requires=pulp-postgres.service
+After=pulp-postgres.service
+{% endif %}
+{% if pulp_quadlet_runtime_mounts %}
+RequiresMountsFor={{ pulp_quadlet_runtime_mounts | join(' ') }}
+{% endif %}
+
+[Container]
+ContainerName=pulp-migration
+Image={{ pulp_runtime_image }}
+Network={{ pulp_quadlet_network_name }}.network
+Exec=pulpcore-manager migrate --noinput
+{% for vol in pulp_quadlet_runtime_volumes %}
+Volume={{ vol }}
+{% endfor %}
+LogDriver={{ pulp_log_driver }}
+{# Quadlet's User=/Group= keys take numeric ids only; pulp_run_user may be the
+   image's "pulp" name OR "uid:gid" (prod runs as the data owner). Pass it
+   through verbatim so both forms work. #}
+PodmanArgs=--user {{ pulp_run_user }}{% if pulp_log_driver == 'journald' %} --log-opt tag=pulp_migration{% endif %}
+
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+# A large database can take a long while; don't let systemd kill it mid-migration.
+TimeoutStartSec={{ pulp_quadlet_migration_timeout }}
+
+[Install]
+WantedBy=multi-user.target

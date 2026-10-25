@@ -1,0 +1,10 @@
+# {{ ansible_managed }}
+# Journald retention for the Pulp container stack (pulp_log_driver=journald).
+# Drop-in overriding /etc/systemd/journald.conf. These limits are GLOBAL to the
+# whole journal — shared by every Pulp service AND every scaled replica (and any
+# other journald user on the host) — not per-container. Size accordingly.
+[Journal]
+Storage={{ pulp_journald_storage }}
+Compress={{ pulp_journald_compress }}
+SystemMaxUse={{ pulp_journald_system_max_use }}
+MaxRetentionSec={{ pulp_journald_max_retention_sec }}

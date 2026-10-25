@@ -1,0 +1,133 @@
+---
+- name: Validate external PostgreSQL configuration
+  ansible.builtin.assert:
+    that:
+      - pulp_postgres_host | length > 0
+      - pulp_postgres_host != 'postgres'
+      - pulp_postgres_password | length > 0
+    fail_msg: >-
+      pulp_postgres_external is true but the connection is not configured. Set
+      pulp_postgres_host to your RDS endpoint (not the default 'postgres') and
+      provide pulp_postgres_password (ideally via ansible-vault).
+  when: pulp_postgres_external | bool
+
+- name: Validate reverse-proxy / replica configuration
+  ansible.builtin.assert:
+    that:
+      - (pulp_api_replicas | int) == 1
+      - (pulp_content_replicas | int) == 1
+    fail_msg: >-
+      pulp_web is disabled, so the api/content gunicorn ports are published on
+      fixed host ports (pulp_api_host_port / pulp_content_host_port) and cannot
+      fan out to multiple replicas. Set pulp_api_replicas and
+      pulp_content_replicas to 1 and scale a single instance via
+      pulp_api_workers / pulp_content_workers instead.
+  when: not (pulp_web_enabled | bool)
+
+# ── Orchestrator validation ─────────────────────────────────────────────────
+# The Quadlet rendering covers every service except pulp_web, which has no
+# equivalent for its service-name DNS load balancing. Fail loudly rather than
+# silently bringing up a partial stack.
+- name: Validate the orchestrator selection
+  ansible.builtin.assert:
+    that: pulp_orchestrator in ['compose', 'quadlet']
+    fail_msg: >-
+      pulp_orchestrator must be "compose" or "quadlet" (got
+      "{{ pulp_orchestrator }}").
+
+- name: Validate the Quadlet orchestrator prerequisites
+  ansible.builtin.assert:
+    that:
+      - pulp_container_engine == 'podman'
+      - not (pulp_web_enabled | bool)
+    fail_msg: >-
+      pulp_orchestrator is "quadlet", which requires:
+        * pulp_container_engine: podman  — Quadlet is a Podman feature and has no
+          Docker equivalent (got "{{ pulp_container_engine }}");
+        * pulp_web_enabled: false        — no pulp_web Quadlet unit is rendered;
+          run an external reverse proxy against the published api/content ports.
+      PostgreSQL works either way: pulp_postgres_external: true points at a
+      managed database, false renders a pulp-postgres unit + its data volume.
+      Use pulp_orchestrator: compose for the bundled pulp_web.
+  when: pulp_orchestrator == 'quadlet'
+
+- name: Install the container engine and its compose tool
+  ansible.builtin.include_tasks: install_engine.yml
+  when: pulp_install_engine | bool
+
+- name: Configure journald log retention
+  ansible.builtin.include_tasks: journald.yml
+  when:
+    - pulp_log_driver == 'journald'
+    - pulp_journald_configure | bool
+
+- name: Lay down the project assets (settings, certs, keys, data dirs)
+  ansible.builtin.include_tasks: deploy.yml
+
+- name: Build the custom Pulp image (extra plugins / vendored patches)
+  ansible.builtin.include_tasks: build_image.yml
+  when: pulp_build_custom_image | bool
+
+# Rendered after build_image.yml: the units reference pulp_runtime_image, which
+# is the locally built localhost/pulp-custom tag when a custom build is enabled,
+# so the image must exist before a unit tries to start from it.
+- name: Render the Quadlet units
+  ansible.builtin.include_tasks: quadlet.yml
+  when: pulp_orchestrator == 'quadlet'
+
+# Apply any config/image changes now (force-recreate) so the readiness check
+# below runs against the final container state, not a stale one.
+- name: Apply pending config/image changes
+  ansible.builtin.meta: flush_handlers
+
+- name: Ensure the Pulp stack is up (compose)
+  ansible.builtin.command:
+    cmd: >-
+      {{ pulp_compose_cmd }} -f compose.yml up -d --remove-orphans
+      --scale pulp_api={{ pulp_api_replicas }}
+      --scale pulp_content={{ pulp_content_replicas }}
+      --scale pulp_worker={{ pulp_worker_replicas }}
+    chdir: "{{ pulp_project_dir }}"
+  register: pulp_compose_up
+  changed_when: >-
+    ('Creating' in pulp_compose_up.stderr) or
+    ('Recreating' in pulp_compose_up.stderr) or
+    ('Started' in pulp_compose_up.stderr) or
+    ('Created' in pulp_compose_up.stderr)
+  when:
+    - pulp_orchestrator == 'compose'
+    - pulp_start_stack | bool
+
+# Quadlet units cannot be `systemctl enable`d — the generator writes them into
+# /run/systemd/generator, so there is nothing to symlink. Boot persistence comes
+# from [Install] WantedBy=multi-user.target inside each .container file, which the
+# generator materialises on daemon-reload; this task only starts them for the
+# current run. daemon_reload covers the first run, where the units were rendered
+# but no handler fired.
+- name: Ensure the Pulp stack is up (Quadlet)
+  ansible.builtin.systemd:
+    name: "{{ item }}"
+    state: started
+    daemon_reload: true
+  loop: "{{ pulp_quadlet_all_units }}"
+  when:
+    - pulp_orchestrator == 'quadlet'
+    - pulp_start_stack | bool
+
+- name: Wait for the Pulp API to report ready
+  ansible.builtin.uri:
+    url: "{{ _pulp_status_base }}/pulp/api/v3/status/"
+    status_code: 200
+    validate_certs: false
+  register: pulp_status
+  retries: 30
+  delay: 10
+  until: pulp_status.status == 200
+  when: pulp_start_stack | bool
+  vars:
+    # With pulp_web the probe hits the published web port; without it, the
+    # api gunicorn port published for the external reverse proxy.
+    _pulp_status_base: >-
+      {{ ('http://127.0.0.1:' ~ pulp_api_host_port) if not (pulp_web_enabled | bool)
+         else ('https://127.0.0.1:' ~ pulp_https_port if pulp_https | bool
+               else 'http://127.0.0.1:' ~ pulp_http_port) }}

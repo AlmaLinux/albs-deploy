@@ -1,0 +1,12 @@
+# {{ ansible_managed }}
+# Podman-managed volume for the Pulp content store. Only rendered when
+# pulp_storage_dir is empty (no host bind mount). Prod bind-mounts the EFS tree
+# instead, so this file is absent there.
+[Unit]
+Description=Pulp content storage volume
+
+[Volume]
+# Name matches what compose.yml.j2 produces ("pulp${DEV_VOLUME_SUFFIX:-data}" =>
+# pulpdata). Critical: a different name here would mount an EMPTY store on an
+# orchestrator switch, and Pulp would report every artifact as missing.
+VolumeName=pulpdata

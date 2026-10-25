@@ -1,0 +1,23 @@
+---
+# ── Dev environment ────────────────────────────────────────────────────────
+# PostgreSQL runs in a Docker container alongside the rest of the stack.
+pulp_postgres_external: false
+pulp_postgres_password: "dev-postgres"
+
+# Plain HTTP is fine for local dev.
+pulp_https: false
+pulp_http_port: 8080
+
+# Dev secrets (override or vault as you see fit).
+pulp_admin_password: "password"
+pulp_secret_key: "dev-only-not-secret-change-for-prod"
+
+# ── OpenTelemetry ──────────────────────────────────────────────────────────
+# Local collector with the debug exporter: metrics/traces land in the
+# collector's log and go nowhere else. Read them with
+#   docker compose -f /opt/pulp/compose.yml logs -f otel-collector
+# OTLP ports published on the host so you can push test data in from outside.
+pulp_otel_enabled: true
+pulp_otel_collector_enabled: true
+pulp_otel_collector_expose_ports: true
+pulp_otel_collector_debug_verbosity: detailed

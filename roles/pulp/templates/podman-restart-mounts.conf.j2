@@ -1,0 +1,7 @@
+# {{ ansible_managed }}
+# Order podman-restart.service after the host bind-mount stores so the stack is
+# not started on boot before an NFS/EFS-backed store is mounted. RequiresMountsFor
+# resolves each path to the .mount unit that provides it and adds both After= and
+# Requires= on it — so the service waits for the mount and won't run if it fails.
+[Unit]
+RequiresMountsFor={{ pulp_podman_bind_mount_paths | join(' ') }}

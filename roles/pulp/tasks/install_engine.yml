@@ -1,0 +1,192 @@
+---
+# Installs the selected container engine (pulp_container_engine) and its compose
+# tool for RHEL- and Debian-family hosts.
+#   docker  -> Docker CE + the compose v2 plugin (daemon-based)
+#   podman  -> podman + podman-compose (daemonless, run rootful via the play's sudo)
+
+# ═══════════════════════════════════════════════════════════════════════════
+#  Docker
+# ═══════════════════════════════════════════════════════════════════════════
+- name: Install Docker
+  when: pulp_container_engine == 'docker'
+  block:
+    # ── RHEL family (AlmaLinux / RHEL / Rocky / CentOS Stream / Fedora) ──────
+    - name: Add the Docker CE yum repository
+      ansible.builtin.yum_repository:
+        name: docker-ce-stable
+        description: Docker CE Stable - $basearch
+        baseurl: "https://download.docker.com/linux/centos/$releasever/$basearch/stable"
+        gpgcheck: true
+        gpgkey: https://download.docker.com/linux/centos/gpg
+        enabled: true
+      when: ansible_os_family == "RedHat"
+
+    - name: Install Docker CE (RHEL family)
+      ansible.builtin.dnf:
+        name:
+          - docker-ce
+          - docker-ce-cli
+          - containerd.io
+          - docker-buildx-plugin
+          - docker-compose-plugin
+        state: present
+      when: ansible_os_family == "RedHat"
+
+    # ── Debian family (Debian / Ubuntu) ─────────────────────────────────────
+    - name: Install prerequisites (Debian family)
+      ansible.builtin.apt:
+        name:
+          - ca-certificates
+          - curl
+          - gnupg
+        state: present
+        update_cache: true
+      when: ansible_os_family == "Debian"
+
+    - name: Add Docker's APT GPG key (Debian family)
+      ansible.builtin.get_url:
+        url: "https://download.docker.com/linux/{{ ansible_distribution | lower }}/gpg"
+        dest: /etc/apt/keyrings/docker.asc
+        mode: "0644"
+      when: ansible_os_family == "Debian"
+
+    - name: Add the Docker CE APT repository (Debian family)
+      ansible.builtin.apt_repository:
+        repo: >-
+          deb [arch={{ 'amd64' if ansible_architecture == 'x86_64' else ansible_architecture }}
+          signed-by=/etc/apt/keyrings/docker.asc]
+          https://download.docker.com/linux/{{ ansible_distribution | lower }}
+          {{ ansible_distribution_release }} stable
+        filename: docker
+        state: present
+      when: ansible_os_family == "Debian"
+
+    - name: Install Docker CE (Debian family)
+      ansible.builtin.apt:
+        name:
+          - docker-ce
+          - docker-ce-cli
+          - containerd.io
+          - docker-buildx-plugin
+          - docker-compose-plugin
+        state: present
+        update_cache: true
+      when: ansible_os_family == "Debian"
+
+    # ── Common ───────────────────────────────────────────────────────────────
+    - name: Ensure Docker is enabled and running
+      ansible.builtin.service:
+        name: docker
+        state: started
+        enabled: true
+
+# ═══════════════════════════════════════════════════════════════════════════
+#  Podman (rootful, daemonless). No engine daemon to supervise the stack, so
+#  restart:always is enforced only by conmon while the host stays up — it does
+#  NOT survive a reboot. podman-restart.service (ships with podman) closes that
+#  gap: on boot it re-starts every container whose policy is restart=always,
+#  which is all our long-lived services. Docker doesn't need this — its enabled
+#  daemon re-applies restart policies itself.
+# ═══════════════════════════════════════════════════════════════════════════
+- name: Install Podman
+  when: pulp_container_engine == 'podman'
+  block:
+    # ── RHEL family ──────────────────────────────────────────────────────────
+    # podman ships in AppStream; podman-compose comes from EPEL. Enable EPEL so
+    # podman-compose is resolvable on a minimal host.
+    # podman-compose is only needed by the compose orchestrator; Quadlet ships
+    # with podman itself, so the EPEL dependency drops out entirely there.
+    - name: Enable EPEL (RHEL family, for podman-compose)
+      ansible.builtin.dnf:
+        name: epel-release
+        state: present
+      when:
+        - ansible_os_family == "RedHat"
+        - pulp_orchestrator == 'compose'
+
+    - name: Install Podman + podman-compose (RHEL family)
+      ansible.builtin.dnf:
+        name: "{{ ['podman'] + (['podman-compose'] if pulp_orchestrator == 'compose' else []) }}"
+        state: present
+      when: ansible_os_family == "RedHat"
+
+    # ── Debian family ────────────────────────────────────────────────────────
+    - name: Install Podman + podman-compose (Debian family)
+      ansible.builtin.apt:
+        name: "{{ ['podman'] + (['podman-compose'] if pulp_orchestrator == 'compose' else []) }}"
+        state: present
+        update_cache: true
+      when: ansible_os_family == "Debian"
+
+    # ── Quadlet availability ────────────────────────────────────────────────
+    # Quadlet template-free rendering needs Notify=healthy (Podman 5.0+). Older
+    # podman silently ignores unknown keys, which would leave dependents starting
+    # before Redis is ready — so check rather than trust the distro.
+    # check_mode: false so this runs during --check too. A command task is skipped
+    # in check mode but still registers, leaving stdout empty — and the assert
+    # below then dies on "Input version value cannot be empty" rather than telling
+    # you anything about the host. Reading a version is read-only, so running it
+    # is safe in a dry run.
+    - name: Read the installed Podman version
+      ansible.builtin.command: podman version --format '{{ "{{" }}.Client.Version{{ "}}" }}'
+      register: pulp_podman_version
+      changed_when: false
+      check_mode: false
+      when: pulp_orchestrator == 'quadlet'
+
+    - name: Require Podman 5.0+ for the Quadlet orchestrator
+      ansible.builtin.assert:
+        that: pulp_podman_version.stdout | trim is version('5.0', '>=')
+        fail_msg: >-
+          pulp_orchestrator is "quadlet" but this host has Podman
+          {{ pulp_podman_version.stdout | trim }}. The units use Notify=healthy,
+          which needs Podman 5.0 or newer; older versions ignore it and start
+          api/content/worker before Redis is ready. Upgrade Podman or use
+          pulp_orchestrator: compose.
+      when: pulp_orchestrator == 'quadlet'
+
+    # ── Boot persistence ─────────────────────────────────────────────────────
+    # Restart restart=always containers after a host reboot. Without this the
+    # daemonless stack stays down until the next `podman-compose up` (or Ansible
+    # run). Guarded so it can be turned off where an external supervisor owns the
+    # stack lifecycle.
+    # Not needed under Quadlet: each unit carries [Install] WantedBy=multi-user.target
+    # and its own RequiresMountsFor=, so systemd owns boot ordering per service
+    # instead of one host-wide policy replay.
+    - name: Enable podman-restart.service (restore the stack after reboot)
+      ansible.builtin.systemd:
+        name: podman-restart.service
+        enabled: true
+      when:
+        - pulp_orchestrator == 'compose'
+        - pulp_podman_restart_service | bool
+
+    # ── Boot ordering for host bind-mount stores ─────────────────────────────
+    # podman-restart.service orders itself only After=network-online.target, so
+    # on a host whose storage/exports live on an NFS/EFS bind mount it can start
+    # containers before that mount is ready (empty store, or start failure).
+    # A RequiresMountsFor drop-in makes it wait for — and require — the backing
+    # mount(s). Only meaningful when at least one store is a host bind mount.
+    - name: Order podman-restart.service after the host bind-mount stores
+      when:
+        - pulp_orchestrator == 'compose'
+        - pulp_podman_restart_service | bool
+        - pulp_podman_bind_mount_paths | length > 0
+      block:
+        - name: Create the podman-restart.service drop-in directory
+          ansible.builtin.file:
+            path: /etc/systemd/system/podman-restart.service.d
+            state: directory
+            mode: "0755"
+
+        - name: Write the RequiresMountsFor drop-in
+          ansible.builtin.template:
+            src: podman-restart-mounts.conf.j2
+            dest: /etc/systemd/system/podman-restart.service.d/10-wait-for-storage.conf
+            mode: "0644"
+          register: pulp_podman_restart_dropin
+
+        - name: Reload systemd so the drop-in takes effect
+          ansible.builtin.systemd:
+            daemon_reload: true
+          when: pulp_podman_restart_dropin is changed

@@ -1,0 +1,330 @@
+# {{ ansible_managed }}
+# Scalable multi-container Pulp stack (based on pulp-oci-images images/compose).
+#
+# Data stores use Docker named volumes by default, or host bind-mounts when the
+# corresponding *_dir variable is set (migration from the systemd deployment).
+# SELinux relabel flags (":z" shared / ":Z" private). Correct on a local FS
+# under Enforcing, but dead work under Permissive and broken on NFS/EFS. The
+# global pulp_selinux_relabel toggles them on ALL bind mounts; storage/exports
+# additionally honor their own per-mount toggles (for the Enforcing+NFS case).
+# Label the mount with a context= option instead when relabel is off. See
+# roles/pulp/defaults/main.yml.
+{% set z = ':z' if (pulp_selinux_relabel | bool) else '' %}
+{% set Z = ':Z' if (pulp_selinux_relabel | bool) else '' %}
+{% set storage_relabel = ':z' if (pulp_storage_selinux_relabel | bool) else '' %}
+{% set exports_relabel = ':z' if (pulp_exports_selinux_relabel | bool) else '' %}
+{% set pulp_storage_volume = (pulp_storage_dir ~ ':' ~ pulp_storage_mount ~ storage_relabel) if pulp_storage_dir else ('pulp:' ~ pulp_storage_mount) %}
+{% set pg_data_volume = (pulp_postgres_data_dir ~ ':/var/lib/postgresql/data' ~ Z) if pulp_postgres_data_dir else 'pg_data:/var/lib/postgresql/data' %}
+{% set redis_volume = (pulp_redis_data_dir ~ ':/data' ~ Z) if pulp_redis_data_dir else 'redis_data:/data' %}
+{% set exports_volume = (pulp_exports_dir ~ ':' ~ pulp_export_path ~ exports_relabel) if pulp_exports_dir else '' %}
+{% set pg_local = not (pulp_postgres_external | bool) %}
+{#- Per-service logging block. Static tag => scaled replicas aggregate under one
+    journalctl -t <tag> while CONTAINER_NAME still separates them. For journald
+    only the tag is emitted; other drivers get their driver line as-is. -#}
+{% macro logging(tag) %}
+    logging:
+      driver: "{{ pulp_log_driver }}"
+{% if pulp_log_driver == 'journald' %}
+      options:
+        tag: "{{ tag }}"
+{%- endif %}
+{%- endmacro %}
+version: '3'
+services:
+{% if pg_local %}
+  postgres:
+    image: "{{ pulp_postgres_image }}"
+{% if pulp_expose_postgres | bool %}
+    ports:
+      - "5432:5432"
+{% endif %}
+    environment:
+      POSTGRES_USER: {{ pulp_postgres_user }}
+      POSTGRES_PASSWORD: {{ pulp_postgres_password }}
+      POSTGRES_DB: {{ pulp_postgres_db }}
+      POSTGRES_INITDB_ARGS: '--auth-host=scram-sha-256'
+      POSTGRES_HOST_AUTH_METHOD: 'scram-sha-256'
+    volumes:
+      - "{{ pg_data_volume }}"
+      - "./assets/postgres/passwd:/etc/passwd{{ Z }}"
+    restart: always
+{{ logging('postgres') }}
+    healthcheck:
+      test: pg_isready -U {{ pulp_postgres_user }}
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+{% endif %}
+  redis:
+    image: "{{ pulp_redis_image }}"
+{% if pulp_expose_redis | bool %}
+    ports:
+      - "6379:6379"
+{% endif %}
+    volumes:
+      - "{{ redis_volume }}"
+    restart: always
+{{ logging('redis') }}
+    healthcheck:
+      test: redis-cli ping
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+{% if pulp_otel_collector_enabled | bool %}
+  # Receives OTLP from pulp_api / pulp_content / pulp_worker. Service name is
+  # the DNS name, so it must match the host part of pulp_otel_exporter_endpoint
+  # — hyphen, not underscore (underscores are invalid in hostnames).
+  #
+  # No depends_on from the Pulp services, deliberately: telemetry is best-effort
+  # and a broken collector must not hold the stack down. The exporters retry.
+  {{ pulp_otel_collector_name }}:
+    image: "{{ pulp_otel_collector_image }}"
+{% if (pulp_otel_collector_expose_ports | bool) or (pulp_otel_collector_prometheus_exporter | bool) or (pulp_otel_collector_telemetry_enabled | bool) %}
+    ports:
+{% if pulp_otel_collector_expose_ports | bool %}
+      # OTLP ingest, for pushing data in from outside the container network.
+      - "{{ pulp_otel_collector_otlp_http_port }}:{{ pulp_otel_collector_otlp_http_port }}"
+      - "{{ pulp_otel_collector_otlp_grpc_port }}:{{ pulp_otel_collector_otlp_grpc_port }}"
+{% endif %}
+{% if pulp_otel_collector_prometheus_exporter | bool %}
+      # Scrape endpoint — Prometheus is outside the container network.
+      - "{{ pulp_otel_collector_prometheus_port }}:{{ pulp_otel_collector_prometheus_port }}"
+{% endif %}
+{% if pulp_otel_collector_telemetry_enabled | bool %}
+      - "{{ pulp_otel_collector_telemetry_port }}:{{ pulp_otel_collector_telemetry_port }}"
+{% endif %}
+{% endif %}
+    volumes:
+      # -contrib image path; the core image uses /etc/otelcol/config.yaml.
+      # Options are comma-separated: ":ro:z" would be an invalid fourth field.
+      - "./assets/otel/config.yaml:/etc/otelcol-contrib/config.yaml:ro{{ z | replace(':', ',') }}"
+    restart: always
+{{ logging('otel_collector') }}
+
+{% endif %}
+  migration_service:
+    image: "{{ pulp_runtime_image }}"
+{% if pg_local %}
+    depends_on:
+      postgres:
+        condition: service_healthy
+{% endif %}
+    command: pulpcore-manager migrate --noinput
+    user: "{{ pulp_run_user }}"
+    volumes:
+      - "./assets/settings.py:/etc/pulp/settings.py{{ z }}"
+      - "./assets/certs:/etc/pulp/certs{{ z }}"
+      - "{{ pulp_storage_volume }}"
+{% if pulp_signing_enabled | bool %}
+
+  signing_key_service:
+    image: "{{ pulp_runtime_image }}"
+    command: sh -c "add_signing_service.sh"
+    depends_on:
+{% if pg_local %}
+      postgres:
+        condition: service_healthy
+{% endif %}
+      migration_service:
+        condition: service_completed_successfully
+    user: "{{ pulp_run_user }}"
+    environment:
+      PULP_SIGNING_KEY_FINGERPRINT: {{ pulp_signing_key_fingerprint }}
+    volumes:
+      - "./assets/settings.py:/etc/pulp/settings.py{{ z }}"
+      - "./assets/certs:/etc/pulp/certs{{ z }}"
+      - "{{ pulp_storage_volume }}"
+{% endif %}
+{% if pulp_set_init_password | bool %}
+
+  set_init_password_service:
+    image: "{{ pulp_runtime_image }}"
+    command: set_init_password.sh
+{% if pg_local %}
+    depends_on:
+      postgres:
+        condition: service_healthy
+{% endif %}
+    user: "{{ pulp_run_user }}"
+    environment:
+      PULP_DEFAULT_ADMIN_PASSWORD: {{ pulp_admin_password }}
+    volumes:
+      - "./assets/settings.py:/etc/pulp/settings.py{{ z }}"
+      - "./assets/certs:/etc/pulp/certs{{ z }}"
+      - "{{ pulp_storage_volume }}"
+{% endif %}
+{% if pulp_web_enabled | bool %}
+
+  pulp_web:
+    image: "{{ pulp_web_image }}"
+    command: ['/usr/bin/nginx.sh']
+    depends_on:
+      pulp_api:
+        condition: service_healthy
+      pulp_content:
+        condition: service_healthy
+    ports:
+{% if pulp_https | bool %}
+      - "{{ pulp_https_port }}:{{ pulp_web_https_listen }}"
+{% if pulp_web_http_redirect | bool %}
+      - "{{ pulp_http_port }}:{{ pulp_web_http_listen }}"
+{% endif %}
+{% else %}
+      - "{{ pulp_http_port }}:{{ pulp_web_http_listen }}"
+{% endif %}
+    hostname: pulp
+    user: root
+    volumes:
+      - "./assets/bin/nginx.sh:/usr/bin/nginx.sh{{ Z }}"
+      - "./assets/nginx/nginx.conf.template:/etc/nginx/nginx.conf.template{{ Z }}"
+{% if pulp_https | bool %}
+      - "./assets/web/certs:/etc/pulp/certs{{ z }}"
+{% endif %}
+    restart: always
+{{ logging('pulp_web') }}
+{% endif %}
+
+  pulp_api:
+    image: "{{ pulp_runtime_image }}"
+    deploy:
+      replicas: {{ pulp_api_replicas }}
+    command: ['pulp-api']
+    environment:
+      PULP_API_WORKERS: "{{ pulp_api_workers }}"
+      PULP_GUNICORN_TIMEOUT: "{{ pulp_gunicorn_timeout }}"
+{% if pulp_otel_enabled | bool %}
+      PULP_OTEL_ENABLED: "true"
+      OTEL_EXPORTER_OTLP_ENDPOINT: "{{ pulp_otel_exporter_endpoint }}"
+      OTEL_EXPORTER_OTLP_PROTOCOL: "{{ pulp_otel_exporter_protocol }}"
+      OTEL_SERVICE_NAME: "pulp-api"
+{% endif %}
+{% if not (pulp_web_enabled | bool) %}
+    ports:
+      - "{{ pulp_api_host_port }}:24817"
+{% endif %}
+    depends_on:
+      redis:
+        condition: service_healthy
+{% if pg_local %}
+      postgres:
+        condition: service_healthy
+{% endif %}
+      migration_service:
+        condition: service_completed_successfully
+{% if pulp_set_init_password | bool %}
+      set_init_password_service:
+        condition: service_completed_successfully
+{% endif %}
+{% if pulp_signing_enabled | bool %}
+      signing_key_service:
+        condition: service_completed_successfully
+{% endif %}
+    hostname: pulp-api
+    user: "{{ pulp_run_user }}"
+    volumes:
+      - "./assets/settings.py:/etc/pulp/settings.py{{ z }}"
+      - "./assets/certs:/etc/pulp/certs{{ z }}"
+      - "{{ pulp_storage_volume }}"
+{% if pulp_exports_dir %}
+      - "{{ exports_volume }}"
+{% endif %}
+    restart: always
+{{ logging('pulp_api') }}
+    healthcheck:
+      test: readyz.py /pulp/api/v3/status/
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 90s
+
+  pulp_content:
+    image: "{{ pulp_runtime_image }}"
+    deploy:
+      replicas: {{ pulp_content_replicas }}
+    command: ['pulp-content']
+    environment:
+      PULP_CONTENT_WORKERS: "{{ pulp_content_workers }}"
+      PULP_GUNICORN_TIMEOUT: "{{ pulp_gunicorn_timeout }}"
+{% if pulp_otel_enabled | bool %}
+      PULP_OTEL_ENABLED: "true"
+      OTEL_EXPORTER_OTLP_ENDPOINT: "{{ pulp_otel_exporter_endpoint }}"
+      OTEL_EXPORTER_OTLP_PROTOCOL: "{{ pulp_otel_exporter_protocol }}"
+      OTEL_SERVICE_NAME: "pulp-content"
+{% endif %}
+{% if not (pulp_web_enabled | bool) %}
+    ports:
+      - "{{ pulp_content_host_port }}:24816"
+{% endif %}
+    depends_on:
+      redis:
+        condition: service_healthy
+{% if pg_local %}
+      postgres:
+        condition: service_healthy
+{% endif %}
+      migration_service:
+        condition: service_completed_successfully
+    hostname: pulp-content
+    user: "{{ pulp_run_user }}"
+    volumes:
+      - "./assets/settings.py:/etc/pulp/settings.py{{ z }}"
+      - "./assets/certs:/etc/pulp/certs{{ z }}"
+      - "{{ pulp_storage_volume }}"
+    restart: always
+{{ logging('pulp_content') }}
+    healthcheck:
+      test: readyz.py /pulp/content/
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 90s
+
+  pulp_worker:
+    image: "{{ pulp_runtime_image }}"
+    deploy:
+      replicas: {{ pulp_worker_replicas }}
+    command: ['pulp-worker']
+{% if pulp_otel_enabled | bool %}
+    environment:
+      PULP_OTEL_ENABLED: "true"
+      OTEL_EXPORTER_OTLP_ENDPOINT: "{{ pulp_otel_exporter_endpoint }}"
+      OTEL_EXPORTER_OTLP_PROTOCOL: "{{ pulp_otel_exporter_protocol }}"
+      OTEL_SERVICE_NAME: "pulp-worker"
+{% endif %}
+    depends_on:
+      redis:
+        condition: service_healthy
+{% if pg_local %}
+      postgres:
+        condition: service_healthy
+{% endif %}
+      migration_service:
+        condition: service_completed_successfully
+    user: "{{ pulp_run_user }}"
+    volumes:
+      - "./assets/settings.py:/etc/pulp/settings.py{{ z }}"
+      - "./assets/certs:/etc/pulp/certs{{ z }}"
+      - "{{ pulp_storage_volume }}"
+{% if pulp_exports_dir %}
+      - "{{ exports_volume }}"
+{% endif %}
+    restart: always
+{{ logging('pulp_worker') }}
+{% if (not pulp_storage_dir) or (pg_local and not pulp_postgres_data_dir) or (not pulp_redis_data_dir) %}
+
+volumes:
+{% if not pulp_storage_dir %}
+  pulp:
+    name: pulp${DEV_VOLUME_SUFFIX:-data}
+{% endif %}
+{% if pg_local and not pulp_postgres_data_dir %}
+  pg_data:
+    name: pg_data${DEV_VOLUME_SUFFIX:-data}
+{% endif %}
+{% if not pulp_redis_data_dir %}
+  redis_data:
+    name: redis_data${DEV_VOLUME_SUFFIX:-data}
+{% endif %}
+{% endif %}

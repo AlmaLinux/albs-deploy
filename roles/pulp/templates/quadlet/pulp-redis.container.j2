@@ -1,0 +1,40 @@
+# {{ ansible_managed }}
+# Redis — Pulp's cache and task broker. The only data-store container in the
+# Quadlet rendering (PostgreSQL is external/RDS in this mode).
+#
+# ContainerName=redis is load-bearing: it is the DNS name aardvark-dns serves on
+# the pulp network, and settings.py points REDIS_HOST at pulp_redis_host, which
+# defaults to "redis". Renaming one without the other breaks the cache silently.
+[Unit]
+Description=Pulp Redis cache and task broker
+{% if pulp_quadlet_redis_mounts %}
+RequiresMountsFor={{ pulp_quadlet_redis_mounts | join(' ') }}
+{% endif %}
+
+[Container]
+ContainerName=redis
+Image={{ pulp_redis_image }}
+Network={{ pulp_quadlet_network_name }}.network
+Volume={{ _pulp_redis_volume | trim }}
+{% if pulp_expose_redis | bool %}
+PublishPort=6379:6379
+{% endif %}
+LogDriver={{ pulp_log_driver }}
+{% if pulp_log_driver == 'journald' %}
+PodmanArgs=--log-opt tag=redis
+{% endif %}
+# Static syslog tag above keeps `journalctl -t redis` working, matching the
+# compose rendering's per-service tags.
+HealthCmd=redis-cli ping
+HealthInterval=10s
+HealthTimeout=5s
+HealthRetries=5
+# Gate dependents on the healthcheck, not merely on the process starting — the
+# Quadlet equivalent of compose's depends_on: condition: service_healthy.
+Notify=healthy
+
+[Service]
+Restart=always
+
+[Install]
+WantedBy=multi-user.target

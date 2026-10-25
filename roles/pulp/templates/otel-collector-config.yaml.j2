@@ -1,0 +1,77 @@
+# {{ ansible_managed }}
+# OpenTelemetry Collector config for the Pulp stack. Shared by both
+# orchestrators — the compose service and the Quadlet unit mount this same file.
+#
+# Pulp PUSHES OTLP here (its processes expose no HTTP endpoint of their own);
+# this file decides where it goes next. Every exporter named in a pipeline below
+# MUST also appear under `exporters:` — a dangling name is a fatal config error
+# and the collector refuses to start.
+{% set metric_exporters = [] %}
+{% if pulp_otel_collector_prometheus_exporter | bool %}
+{%   set _ = metric_exporters.append('prometheus') %}
+{% endif %}
+{% if pulp_otel_collector_metrics_endpoint %}
+{%   set _ = metric_exporters.append('otlphttp/metrics') %}
+{% endif %}
+{% if not metric_exporters %}
+{%   set _ = metric_exporters.append('debug') %}
+{% endif %}
+receivers:
+  otlp:
+    protocols:
+      http:
+        endpoint: "0.0.0.0:{{ pulp_otel_collector_otlp_http_port }}"
+      grpc:
+        endpoint: "0.0.0.0:{{ pulp_otel_collector_otlp_grpc_port }}"
+
+processors:
+  # Shed load rather than OOM the collector when a backend is slow or down.
+  memory_limiter:
+    check_interval: 5s
+    limit_percentage: 75
+    spike_limit_percentage: 25
+  # One batched stream out instead of one request per exporting process. Pulp's
+  # api runs pulp_api_workers gunicorn processes, each exporting on its own.
+  batch: {}
+
+exporters:
+  # Always defined: the traces pipeline uses it, and it is the fallback when no
+  # metrics exporter is configured. Writes to the collector's own log —
+  # `journalctl -u otel-collector` (quadlet) / `docker compose logs` (compose).
+  debug:
+    verbosity: {{ pulp_otel_collector_debug_verbosity }}
+{% if pulp_otel_collector_prometheus_exporter | bool %}
+  # Serves a Prometheus /metrics scrape endpoint. NOTE: this is the "prometheus"
+  # exporter (pull), not "prometheusremotewrite" (push). Metric names arrive
+  # translated — OTel's api.request_duration becomes api_request_duration_* with
+  # a unit suffix and _bucket/_sum/_count series.
+  prometheus:
+    endpoint: "0.0.0.0:{{ pulp_otel_collector_prometheus_port }}"
+{% endif %}
+{% if pulp_otel_collector_metrics_endpoint %}
+  otlphttp/metrics:
+    endpoint: "{{ pulp_otel_collector_metrics_endpoint }}"
+{% endif %}
+
+service:
+{% if pulp_otel_collector_telemetry_enabled | bool %}
+  # The collector's own metrics, for debugging the pipeline itself:
+  #   otelcol_receiver_accepted_metric_points  -> did Pulp send anything
+  #   otelcol_exporter_sent_metric_points      -> did it go out
+  #   otelcol_exporter_send_failed_metric_points
+  telemetry:
+    metrics:
+      address: "0.0.0.0:{{ pulp_otel_collector_telemetry_port }}"
+{% endif %}
+  pipelines:
+    metrics:
+      receivers: [otlp]
+      processors: [memory_limiter, batch]
+      exporters: [{{ metric_exporters | join(', ') }}]
+    # Traces terminate at debug. Prometheus cannot ingest them, and a pipeline
+    # with no exporter is a config error — so the collector absorbs them instead
+    # of leaving Pulp's exporter retrying against an endpoint that rejects them.
+    traces:
+      receivers: [otlp]
+      processors: [memory_limiter, batch]
+      exporters: [debug]
