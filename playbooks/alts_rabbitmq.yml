@@ -1,0 +1,6 @@
+---
+- name: Install RabbitMQ for ALTS and setup TLS
+  hosts: rabbitmq
+  roles:
+    - alts_base
+    - alts_rabbitmq_server

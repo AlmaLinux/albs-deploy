@@ -4,4 +4,8 @@
 !inventory/group_vars/all.yml.tmpl
 vars.yml
 roles/ezamriy.fail2ban
+roles/geerlingguy.docker
+roles/geerlingguy.redis
+# ALTS TLS certificates and keys, provided by the deployer
+playbooks/files/alts/
 .vscode/*

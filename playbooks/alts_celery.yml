@@ -1,0 +1,17 @@
+---
+- name: Install ALTS Celery worker
+  hosts: celery
+  vars:
+    docker_users:
+      - "{{ test_system_user }}"
+  roles:
+    - alts_base
+    # TODO: add role for building docker for s390x
+    - role: geerlingguy.docker
+      tags:
+        - install_docker
+    - alts_docker_customization
+    - role: alts_terraform
+      tags:
+        - terraform
+    - alts_celery

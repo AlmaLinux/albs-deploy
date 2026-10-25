@@ -1,0 +1,8 @@
+---
+- name: Configure ALTS scheduler
+  hosts: scheduler
+  roles:
+    - alts_base
+    - geerlingguy.redis
+    - alts_scheduler
+    - { role: alts_flower, tags: ["flower-setup"] }

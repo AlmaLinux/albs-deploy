@@ -159,6 +159,27 @@ rabbitmq_vhost:
 pulp_password:
 ```
 
+## ALTS (production-like deployment)
+Standalone ALTS services (RabbitMQ broker, scheduler with Flower, Celery
+workers) are deployed by separate playbooks using the `inventories/alts`
+inventory. Copy it, put your hosts into `hosts.yml` and adjust
+`group_vars/*.yml` (passwords, JWT secret, Pulp credentials, etc.).
+
+TLS certificates and keys are not stored in the repository. Put them into
+`playbooks/files/alts/` (gitignored):
+```
+playbooks/files/alts/celery/{ca_certificate,client_certificate,client_key}.pem
+playbooks/files/alts/rabbitmq/{ca_certificate,server_certificate,server_key}.pem
+```
+
+Then run the playbooks in order:
+```bash
+ansible-galaxy install -r requirements.yml
+ansible-playbook -i inventories/alts playbooks/alts_rabbitmq.yml
+ansible-playbook -i inventories/alts playbooks/alts_scheduler.yml -e flower_password=<password>
+ansible-playbook -i inventories/alts playbooks/alts_celery.yml
+```
+
 ## Contributing to albs-deploy
 Any question? Found a bug? File an [issue](https://github.com/AlmaLinux/build-system/issues).
 Do you want to contribute with source code?
