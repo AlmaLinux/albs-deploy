@@ -1,0 +1,103 @@
+---
+# Derived values shared by the compose and Quadlet renderings. These are NOT
+# meant to be overridden per-environment (role vars outrank group_vars) — tune
+# the inputs in defaults/main.yml instead.
+
+# ── SELinux relabel suffixes ────────────────────────────────────────────────
+# Same semantics as the {% set %} preamble in compose.yml.j2: ":z" shared /
+# ":Z" private, empty when relabeling is off. Named-volume mounts never get one.
+_pulp_z: "{{ ':z' if (pulp_selinux_relabel | bool) else '' }}"
+_pulp_Z: "{{ ':Z' if (pulp_selinux_relabel | bool) else '' }}"
+_pulp_storage_z: "{{ ':z' if (pulp_storage_selinux_relabel | bool) else '' }}"
+_pulp_exports_z: "{{ ':z' if (pulp_exports_selinux_relabel | bool) else '' }}"
+
+# ── Quadlet layout ──────────────────────────────────────────────────────────
+# Rootful Quadlet search path. Files dropped here are turned into systemd units
+# by podman-system-generator on daemon-reload and at boot.
+pulp_quadlet_dir: /etc/containers/systemd
+
+# Name of the podman network the stack shares. Also the basename of the
+# .network unit, which every .container references as "<name>.network" — Quadlet
+# resolves that to the generated pulp-network.service and adds the ordering.
+pulp_quadlet_network_name: pulp
+
+# ── Volume lines for the pulp-minimal based services ────────────────────────
+# A bind mount is "host:container[:opts]"; a named volume references the .volume
+# unit ("pulp-storage.volume:/var/lib/pulp"), which Quadlet resolves to the
+# podman volume it manages.
+_pulp_storage_volume: >-
+  {{ (pulp_storage_dir ~ ':' ~ pulp_storage_mount ~ _pulp_storage_z)
+     if pulp_storage_dir else ('pulp-storage.volume:' ~ pulp_storage_mount) }}
+_pulp_exports_volume: >-
+  {{ (pulp_exports_dir ~ ':' ~ pulp_export_path ~ _pulp_exports_z)
+     if pulp_exports_dir else '' }}
+_pulp_redis_volume: >-
+  {{ (pulp_redis_data_dir ~ ':/data' ~ _pulp_Z)
+     if pulp_redis_data_dir else 'pulp-redis-data.volume:/data' }}
+_pulp_pg_data_volume: >-
+  {{ (pulp_postgres_data_dir ~ ':/var/lib/postgresql/data' ~ _pulp_Z)
+     if pulp_postgres_data_dir else 'pulp-pg-data.volume:/var/lib/postgresql/data' }}
+
+# Mounts shared by api / content / worker / the one-shots: the rendered config
+# assets, the certs dir (settings.py, DB-fields key, token keypair), the content
+# store, and — only when it is a separate bind mount — the exports dir.
+pulp_quadlet_runtime_volumes: >-
+  {{ [pulp_assets_dir ~ '/settings.py:/etc/pulp/settings.py' ~ _pulp_z,
+      pulp_assets_dir ~ '/certs:/etc/pulp/certs' ~ _pulp_z,
+      _pulp_storage_volume | trim]
+     + ([_pulp_exports_volume | trim] if pulp_exports_dir else []) }}
+
+# Host bind-mount sources the runtime services depend on. Fed to RequiresMountsFor
+# so a unit waits for (and requires) the .mount unit providing an NFS/EFS-backed
+# store instead of starting against an empty directory. Quadlet replaces the
+# host-wide podman-restart.service drop-in with this per-unit ordering.
+pulp_quadlet_runtime_mounts: "{{ [pulp_storage_dir, pulp_exports_dir] | select | list }}"
+pulp_quadlet_redis_mounts: "{{ [pulp_redis_data_dir] | select | list }}"
+pulp_quadlet_pg_mounts: "{{ [pulp_postgres_data_dir] | select | list }}"
+
+# The postgres unit, as a list so it folds into the dependency lists below and
+# vanishes entirely when the database is external (RDS) and nothing is rendered.
+_pulp_quadlet_pg_unit: >-
+  {{ ['pulp-postgres.service'] if not (pulp_postgres_external | bool) else [] }}
+
+# Services api/content/worker must wait on. The one-shots are Type=oneshot +
+# RemainAfterExit=yes, so After= on them means "after it completed successfully"
+# — the Quadlet equivalent of compose's condition: service_completed_successfully.
+pulp_quadlet_runtime_after: >-
+  {{ _pulp_quadlet_pg_unit
+     + ['pulp-redis.service', 'pulp-migration.service']
+     + (['pulp-signing.service'] if pulp_signing_enabled | bool else [])
+     + (['pulp-init-password.service'] if pulp_set_init_password | bool else []) }}
+
+# The long-lived services that mount the rendered config assets. These are what
+# a settings.py / certs change has to restart — redis mounts none of it and the
+# one-shots have already exited.
+pulp_quadlet_runtime_units: >-
+  {{ ['pulp-api.service', 'pulp-content.service']
+     + (range(1, (pulp_worker_replicas | int) + 1)
+        | map('regex_replace', '^(.*)$', 'pulp-worker-\1.service') | list) }}
+
+# The data stores. They mount none of the rendered config assets, so a
+# settings.py change must NOT restart them — but a change to their own unit file
+# (image bump, exposed port, volume swap) has to be applied somehow, which is
+# what the "Restart Pulp data stores" handler topic uses this for.
+pulp_quadlet_datastore_units: >-
+  {{ _pulp_quadlet_pg_unit + ['pulp-redis.service'] }}
+
+# The collector, when enabled. Started by the playbook and WantedBy the boot
+# target, but deliberately absent from pulp_quadlet_runtime_after — nothing in
+# the Pulp stack requires it.
+pulp_quadlet_collector_units: >-
+  {{ ['otel-collector.service'] if pulp_otel_collector_enabled | bool else [] }}
+
+# Everything to bring up, in dependency order. systemd would resolve this from
+# the units' own Requires=/After=, but starting them explicitly in order surfaces
+# a failing one-shot as that unit's failure rather than as an opaque dependency
+# error on pulp-api.
+pulp_quadlet_all_units: >-
+  {{ _pulp_quadlet_pg_unit
+     + ['pulp-redis.service', 'pulp-migration.service']
+     + (['pulp-signing.service'] if pulp_signing_enabled | bool else [])
+     + (['pulp-init-password.service'] if pulp_set_init_password | bool else [])
+     + pulp_quadlet_runtime_units
+     + pulp_quadlet_collector_units }}

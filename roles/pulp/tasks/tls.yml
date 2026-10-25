@@ -1,0 +1,59 @@
+---
+# Provision the pulp-web TLS certificate + key at {{ pulp_web_certs_dir }}.
+# Precedence: explicit cert/key files > self-signed (non-prod) > fail.
+
+- name: Create the webserver certs directory
+  ansible.builtin.file:
+    path: "{{ pulp_web_certs_dir }}"
+    state: directory
+    mode: "0750"
+
+- name: Fail when HTTPS is enabled but no certificate source is configured
+  ansible.builtin.fail:
+    msg: >-
+      pulp_https is true but no certificate is available. Set pulp_tls_cert_src
+      and pulp_tls_key_src to your PEM files, or set
+      pulp_tls_generate_self_signed: true for a non-production self-signed cert.
+  when:
+    - not (pulp_tls_cert_src and pulp_tls_key_src)
+    - not (pulp_tls_generate_self_signed | bool)
+
+# ── Provided certificate ────────────────────────────────────────────────────
+- name: Install the provided TLS certificate
+  ansible.builtin.copy:
+    src: "{{ pulp_tls_cert_src }}"
+    dest: "{{ pulp_web_certs_dir }}/pulp_webserver.crt"
+    mode: "0644"
+  when: pulp_tls_cert_src and pulp_tls_key_src
+  notify: Restart Pulp stack
+
+- name: Install the provided TLS private key
+  ansible.builtin.copy:
+    src: "{{ pulp_tls_key_src }}"
+    dest: "{{ pulp_web_certs_dir }}/pulp_webserver.key"
+    mode: "0640"
+  when: pulp_tls_cert_src and pulp_tls_key_src
+  notify: Restart Pulp stack
+
+# ── Self-signed fallback (NON-PRODUCTION) ───────────────────────────────────
+- name: Generate a self-signed TLS certificate (non-production)
+  ansible.builtin.command:
+    cmd: >-
+      openssl req -x509 -nodes -newkey rsa:4096 -days 3650
+      -keyout {{ pulp_web_certs_dir }}/pulp_webserver.key
+      -out {{ pulp_web_certs_dir }}/pulp_webserver.crt
+      -subj "/CN={{ pulp_tls_cn }}"
+      -addext "subjectAltName=DNS:{{ pulp_tls_cn }}"
+    creates: "{{ pulp_web_certs_dir }}/pulp_webserver.crt"
+  when:
+    - not (pulp_tls_cert_src and pulp_tls_key_src)
+    - pulp_tls_generate_self_signed | bool
+  notify: Restart Pulp stack
+
+- name: Tighten self-signed key permissions
+  ansible.builtin.file:
+    path: "{{ pulp_web_certs_dir }}/pulp_webserver.key"
+    mode: "0640"
+  when:
+    - not (pulp_tls_cert_src and pulp_tls_key_src)
+    - pulp_tls_generate_self_signed | bool

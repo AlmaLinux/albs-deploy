@@ -1,0 +1,11 @@
+# {{ ansible_managed }}
+# Podman-managed volume for the Redis append-only/RDB data. Only rendered when
+# pulp_redis_data_dir is empty (no host bind mount).
+[Unit]
+Description=Pulp Redis data volume
+
+[Volume]
+# Name matches what compose.yml.j2 produces ("redis_data${DEV_VOLUME_SUFFIX:-data}"
+# => redis_datadata), so switching orchestrators REUSES the existing volume
+# instead of silently starting from an empty one.
+VolumeName=redis_datadata

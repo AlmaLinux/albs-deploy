@@ -7,3 +7,21 @@ roles/ezamriy.fail2ban
 roles/geerlingguy.docker
 roles/geerlingguy.redis
 .vscode/*
+
+# Secrets — never commit
+.vault_pass
+.vault-password
+*vault-pass*
+secrets/
+prod-secrets.yml
+sign_vars.yml
+inventories/pulp/prod_hosts.*
+roles/pulp/files/*.key
+roles/pulp/files/*.pem
+roles/pulp/files/*.crt
+
+# Caches
+.mypy_cache/
+__pycache__/
+*.py[cod]
+.DS_Store

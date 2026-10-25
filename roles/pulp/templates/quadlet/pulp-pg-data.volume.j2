@@ -1,0 +1,15 @@
+# {{ ansible_managed }}
+# Podman-managed volume for the containerised PostgreSQL data directory. Only
+# rendered when the database runs locally (pulp_postgres_external is false) AND
+# pulp_postgres_data_dir is empty (no host bind mount).
+[Unit]
+Description=Pulp PostgreSQL data volume
+
+[Volume]
+# Name matches what compose.yml.j2 produces ("pg_data${DEV_VOLUME_SUFFIX:-data}"
+# => pg_datadata), so a podman-compose -> Quadlet switch REUSES the existing
+# volume. NOTE: this only holds when the old stack was podman-compose. Docker
+# keeps its volumes in a separate store (/var/lib/docker/volumes), so a
+# docker-compose -> Quadlet move starts from an EMPTY database and needs a
+# pg_dump/pg_restore instead.
+VolumeName=pg_datadata

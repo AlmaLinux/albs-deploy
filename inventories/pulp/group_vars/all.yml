@@ -1,0 +1,26 @@
+---
+# ─────────────────────────────────────────────────────────────────────────
+# Settings shared by ALL environments. Environment-specific values (Postgres
+# location, HTTPS, secrets) live in group_vars/dev.yml and group_vars/prod.yml.
+# Full list of knobs: roles/pulp/defaults/main.yml
+# ─────────────────────────────────────────────────────────────────────────
+
+# Where the compose project and its mounted assets live on the target host.
+pulp_project_dir: /opt/pulp
+
+# Horizontal scaling (the whole point of the multi-container topology).
+pulp_api_replicas: 2
+pulp_content_replicas: 2
+pulp_worker_replicas: 2
+
+# ── Plugins ───────────────────────────────────────────────────────────────
+# pulp/pulp-minimal bundles a set of plugins that varies by image tag (see
+# pulp_image_tag in roles/pulp/defaults/main.yml — currently 3.114.1). The 3.49.x
+# line bundled: pulp-rpm, pulp-deb, pulp-container, pulp-python, pulp-file,
+# pulp-ansible, pulp-maven, pulp-ostree, pulp-certguard; later tags add more
+# (pulp-gem/npm/hugging-face among them). Confirm against the exact tag you
+# deploy rather than trusting this list:
+#   docker run --rm pulp/pulp-minimal:3.114.1 pip list | grep pulp
+# List ONLY plugins NOT in that set here; a non-empty list triggers a custom
+# image build (FROM pulp/pulp-minimal) that pip-installs them.
+pulp_extra_plugins: []

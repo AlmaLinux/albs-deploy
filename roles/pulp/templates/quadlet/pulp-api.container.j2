@@ -1,0 +1,50 @@
+# {{ ansible_managed }}
+# pulp-api gunicorn. In Quadlet mode the bundled pulp_web is disabled, so this
+# publishes its gunicorn port directly for the EXTERNAL reverse proxy. That fixed
+# host port is also why this service is single-instance (scale via
+# pulp_api_workers, not replicas).
+[Unit]
+Description=Pulp API service
+Requires={{ pulp_quadlet_runtime_after | join(' ') }}
+After={{ pulp_quadlet_runtime_after | join(' ') }}
+{% if pulp_quadlet_runtime_mounts %}
+RequiresMountsFor={{ pulp_quadlet_runtime_mounts | join(' ') }}
+{% endif %}
+
+[Container]
+ContainerName=pulp-api
+Image={{ pulp_runtime_image }}
+Network={{ pulp_quadlet_network_name }}.network
+HostName=pulp-api
+Exec=pulp-api
+PublishPort={{ pulp_api_host_port }}:24817
+Environment=PULP_API_WORKERS={{ pulp_api_workers }}
+Environment=PULP_GUNICORN_TIMEOUT={{ pulp_gunicorn_timeout }}
+{% if pulp_otel_enabled | bool %}
+Environment=PULP_OTEL_ENABLED=true
+Environment=OTEL_EXPORTER_OTLP_ENDPOINT={{ pulp_otel_exporter_endpoint }}
+Environment=OTEL_EXPORTER_OTLP_PROTOCOL={{ pulp_otel_exporter_protocol }}
+Environment=OTEL_SERVICE_NAME=pulp-api
+{% endif %}
+{% for vol in pulp_quadlet_runtime_volumes %}
+Volume={{ vol }}
+{% endfor %}
+LogDriver={{ pulp_log_driver }}
+PodmanArgs=--user {{ pulp_run_user }}{% if pulp_log_driver == 'journald' %} --log-opt tag=pulp_api{% endif %}
+
+# Healthcheck is informational here (visible in `podman ps` / `podman
+# healthcheck run`). Deliberately NO Notify=healthy: nothing orders itself after
+# api in this topology (pulp_web is disabled), so gating unit startup on the
+# probe would only add a way for a slow first boot to mark the unit failed.
+HealthCmd=readyz.py /pulp/api/v3/status/
+HealthInterval=10s
+HealthTimeout=5s
+HealthRetries=5
+HealthStartPeriod=90s
+
+[Service]
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

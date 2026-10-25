@@ -1,0 +1,57 @@
+# {{ ansible_managed }}
+# PostgreSQL — Pulp's database. Only rendered when pulp_postgres_external is
+# false; with a managed database (RDS) there is nothing to run here.
+#
+# ContainerName=postgres is load-bearing: it is the DNS name aardvark-dns serves
+# on the pulp network, and settings.py points DATABASES.HOST at
+# pulp_postgres_host, which defaults to "postgres". Renaming one without the
+# other breaks every service with a connection error.
+#
+# The /etc/passwd bind mount is the upstream pulp-oci-images workaround: the
+# image's entrypoint needs a passwd entry for the uid it runs as, which is not
+# guaranteed under an arbitrary uid mapping.
+[Unit]
+Description=Pulp PostgreSQL database
+{% if pulp_quadlet_pg_mounts %}
+RequiresMountsFor={{ pulp_quadlet_pg_mounts | join(' ') }}
+{% endif %}
+
+[Container]
+ContainerName=postgres
+Image={{ pulp_postgres_image }}
+Network={{ pulp_quadlet_network_name }}.network
+Environment=POSTGRES_USER={{ pulp_postgres_user }}
+Environment=POSTGRES_PASSWORD={{ pulp_postgres_password }}
+Environment=POSTGRES_DB={{ pulp_postgres_db }}
+Environment=POSTGRES_INITDB_ARGS=--auth-host=scram-sha-256
+Environment=POSTGRES_HOST_AUTH_METHOD=scram-sha-256
+Volume={{ _pulp_pg_data_volume | trim }}
+Volume={{ pulp_assets_dir }}/postgres/passwd:/etc/passwd{{ _pulp_Z }}
+{% if pulp_expose_postgres | bool %}
+PublishPort=5432:5432
+{% endif %}
+LogDriver={{ pulp_log_driver }}
+{% if pulp_log_driver == 'journald' %}
+PodmanArgs=--log-opt tag=postgres
+{% endif %}
+# Static syslog tag above keeps `journalctl -t postgres` working, matching the
+# compose rendering's per-service tags.
+#
+# No --user here, deliberately: the postgres image manages its own uid switch
+# from root (initdb refuses to run as an arbitrary uid), unlike the pulp-minimal
+# services which run as pulp_run_user.
+HealthCmd=pg_isready -U {{ pulp_postgres_user }}
+HealthInterval=10s
+HealthTimeout=5s
+HealthRetries=5
+# Gate dependents on the healthcheck, not merely on the process starting. This
+# is what makes After=pulp-postgres.service mean "accepting connections" —
+# without it pulp-migration races initdb on a first bring-up, which is the exact
+# failure compose avoided with condition: service_healthy.
+Notify=healthy
+
+[Service]
+Restart=always
+
+[Install]
+WantedBy=multi-user.target

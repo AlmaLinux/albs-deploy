@@ -1,0 +1,17 @@
+---
+# Codify journald retention for the Pulp stack so log rotation lives with the
+# deployment. Written as a drop-in so the distro's base journald.conf is left
+# intact. Only included when pulp_log_driver == "journald" and the operator
+# opts in via pulp_journald_configure.
+- name: Ensure the journald drop-in directory exists
+  ansible.builtin.file:
+    path: /etc/systemd/journald.conf.d
+    state: directory
+    mode: "0755"
+
+- name: Configure journald retention for the Pulp stack
+  ansible.builtin.template:
+    src: journald-pulp.conf.j2
+    dest: /etc/systemd/journald.conf.d/pulp.conf
+    mode: "0644"
+  notify: Restart systemd-journald

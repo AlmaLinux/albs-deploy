@@ -1,0 +1,81 @@
+---
+# ── Staging environment ──────────────────────────────────────────────────────
+# Self-contained staging: PostgreSQL runs in a Docker container (like dev), so
+# no external RDS is needed. To mirror prod with an external DB instead, set
+# pulp_postgres_external: true and provide the connection details + password.
+pulp_postgres_external: false
+# Creds MUST match albs-deploy (one_vm inventory) so the ALBS stack it deployed
+# can talk to this Pulp: Pulp's postgres superuser is postgres/password, db pulp;
+# Pulp admin is admin/password (albs-deploy's pulp_password). Keep in sync with
+# the ALBS side (albs-web-server's vars.env).
+pulp_postgres_user: postgres
+pulp_postgres_password: password
+pulp_postgres_db: pulp
+pulp_admin_password: password
+
+# Origin ALBS uses to reach Pulp content (in-network, via the shared pulp net).
+# Use the host "pulp" (pulp_web's hostname), NOT "pulp_web": Django rejects the
+# underscore in the Host header (RFC 1034/1035) with DisallowedHost.
+pulp_content_origin: "http://pulp"
+
+# ── HTTPS ──────────────────────────────────────────────────────────────────
+# TLS disabled on staging — plain HTTP only.
+pulp_https: false
+pulp_http_port: 80
+# pulp_web listens on 80 internally too, so the whole ALBS stack can reach Pulp
+# at plain "http://pulp" (port 80) — the all-in-one convention its configs use.
+pulp_web_http_listen: 80
+# pulp_https_port: 443
+# pulp_tls_cert_src: files/pulp_webserver.crt   # PEM cert (+ intermediate chain)
+# pulp_tls_key_src: files/pulp_webserver.key    # PEM private key
+
+# ── Data ───────────────────────────────────────────────────────────────────
+# Content + export stores bind-mounted on the host. Postgres runs in a
+# container; its data sits in a Docker named volume unless you also set
+# pulp_postgres_data_dir to a host path.
+pulp_storage_dir: /srv/pulp_storage
+pulp_exports_dir: /srv/pulp_exports        # enable PulpExport/Import
+# pulp_postgres_data_dir: /srv/pulp_pgdata
+
+# ── Secrets ────────────────────────────────────────────────────────────────
+# DO NOT commit these in plaintext. Encrypt each value inline and paste here:
+#   ansible-vault encrypt_string '<rds password>'           --name pulp_postgres_password
+#   ansible-vault encrypt_string '<initial admin password>' --name pulp_admin_password
+#   ansible-vault encrypt_string "$(openssl rand -base64 50)" --name pulp_secret_key
+# pulp_postgres_password: !vault | ...
+# pulp_admin_password: !vault | ...
+# pulp_secret_key: !vault | ...
+# Then run with --ask-vault-pass (or --vault-password-file).
+# (Alternatively keep a separate encrypted file and pass it with -e @secrets/staging.yml.)
+
+# ── Orchestrator: Quadlet ───────────────────────────────────────────────────
+# One systemd unit per container instead of podman-compose. Podman only, and no
+# pulp_web unit is rendered — front api (8081) and content (24816) with your own
+# nginx. PostgreSQL still runs in a container (pulp_postgres_external is false
+# above), as pulp-postgres.container + the pg_datadata volume.
+# api/content are single-instance because their host ports are fixed; scale them
+# with pulp_api_workers / pulp_content_workers instead. Workers scale by replica
+# count as usual.
+pulp_container_engine: podman
+pulp_orchestrator: quadlet
+pulp_web_enabled: false
+pulp_api_replicas: 1
+pulp_content_replicas: 1
+
+# ── OpenTelemetry ──────────────────────────────────────────────────────────
+# Collector runs as otel-collector.container on the pulp network; Pulp reaches
+# it at the pulp_otel_exporter_endpoint default (http://otel-collector:4318).
+#
+# Metrics are SCRAPED off the collector (pulp_otel_collector_prometheus_exporter
+# is on by default), so point Prometheus at <staging-host>:8889 — no OTLP
+# receiver needs enabling on the Prometheus side:
+#   scrape_configs:
+#     - job_name: pulp-staging
+#       static_configs:
+#         - targets: ['<staging-host>:8889']
+# Collector self-metrics are on :8888 for debugging the pipeline.
+#
+# pulp_otel_collector_metrics_endpoint additionally PUSHES to an OTLP endpoint;
+# not needed when scraping.
+pulp_otel_enabled: true
+pulp_otel_collector_enabled: true

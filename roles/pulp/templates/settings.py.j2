@@ -1,0 +1,64 @@
+# {{ ansible_managed }}
+# Pulp settings — mounted at /etc/pulp/settings.py in every pulp service.
+# Every value here is driven from role variables (see roles/pulp/defaults/main.yml).
+# Reference: https://pulpproject.org/pulpcore/docs/admin/reference/settings/
+
+SECRET_KEY = "{{ pulp_secret_key }}"
+CONTENT_ORIGIN = "{{ pulp_content_origin }}"
+
+DATABASES = {
+    "default": {
+        "HOST": "{{ pulp_postgres_host }}",
+        "ENGINE": "django.db.backends.postgresql",
+        "NAME": "{{ pulp_postgres_db }}",
+        "USER": "{{ pulp_postgres_user }}",
+        "PASSWORD": "{{ pulp_postgres_password }}",
+        "PORT": "{{ pulp_postgres_port }}",
+{% if pulp_postgres_conn_max_age is defined %}
+        "CONN_MAX_AGE": {{ pulp_postgres_conn_max_age }},
+{% endif %}
+{% if pulp_postgres_sslmode is defined %}
+        "OPTIONS": {"sslmode": "{{ pulp_postgres_sslmode }}"},
+{% endif %}
+    }
+}
+
+DB_ENCRYPTION_KEY = "{{ pulp_db_encryption_key_path }}"
+
+CACHE_ENABLED = {{ pulp_cache_enabled | bool }}
+REDIS_HOST = "{{ pulp_redis_host }}"
+REDIS_PORT = {{ pulp_redis_port }}
+REDIS_PASSWORD = "{{ pulp_redis_password }}"
+
+ANSIBLE_API_HOSTNAME = "{{ pulp_ansible_api_hostname }}"
+ANSIBLE_CONTENT_HOSTNAME = "{{ pulp_ansible_content_hostname }}"
+
+# ── Filesystem layout (container-internal paths under the pulp storage mount) ─
+DEPLOY_ROOT = "{{ pulp_deploy_root }}"
+MEDIA_ROOT = "{{ pulp_media_root }}"
+WORKING_DIRECTORY = "{{ pulp_working_directory }}"
+FILE_UPLOAD_TEMP_DIR = "{{ pulp_file_upload_temp_dir }}"
+STATIC_ROOT = "{{ pulp_static_root }}"
+STATIC_URL = "{{ pulp_static_url }}"
+CONTENT_PATH_PREFIX = "{{ pulp_content_path_prefix }}"
+
+ALLOWED_IMPORT_PATHS = {{ pulp_allowed_import_paths | to_json }}
+ALLOWED_EXPORT_PATHS = {{ pulp_allowed_export_paths | to_json }}
+
+# ── Content / upload protection windows (minutes) and app TTL (seconds) ──────
+UPLOAD_PROTECTION_TIME = {{ pulp_upload_protection_time }}
+TMPFILE_PROTECTION_TIME = {{ pulp_tmpfile_protection_time }}
+API_APP_TTL = {{ pulp_api_app_ttl }}
+
+ALLOWED_CONTENT_CHECKSUMS = {{ pulp_allowed_content_checksums | to_json }}
+
+AUTHENTICATION_BACKENDS = {{ pulp_authentication_backends | to_json }}
+
+# ── pulp_container token auth ───────────────────────────────────────────────
+TOKEN_SERVER = "{{ pulp_token_server }}"
+TOKEN_AUTH_DISABLED = {{ pulp_token_auth_disabled | bool }}
+TOKEN_SIGNATURE_ALGORITHM = "{{ pulp_token_signature_algorithm }}"
+PUBLIC_KEY_PATH = "{{ pulp_token_public_key_path }}"
+PRIVATE_KEY_PATH = "{{ pulp_token_private_key_path }}"
+
+ANALYTICS = {{ pulp_analytics | bool }}

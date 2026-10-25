@@ -1,0 +1,204 @@
+---
+# Render the Pulp stack as Quadlet units under {{ pulp_quadlet_dir }}.
+# podman-system-generator turns each file into a systemd service on
+# daemon-reload and at boot; [Install] WantedBy=multi-user.target in each unit is
+# what makes the stack come back after a reboot, replacing the compose path's
+# podman-restart.service + RequiresMountsFor drop-in.
+#
+# Only the services this mode supports are rendered: no postgres unit (external
+# PostgreSQL) and no pulp_web unit (external reverse proxy). main.yml asserts both
+# before this file is included.
+
+- name: Ensure the Quadlet unit directory exists
+  ansible.builtin.file:
+    path: "{{ pulp_quadlet_dir }}"
+    state: directory
+    mode: "0755"
+
+# ── Network ─────────────────────────────────────────────────────────────────
+- name: Render the Pulp network unit
+  ansible.builtin.template:
+    src: quadlet/pulp.network.j2
+    dest: "{{ pulp_quadlet_dir }}/pulp.network"
+    mode: "0644"
+  notify:
+    - Restart Pulp stack
+    - Restart Pulp data stores
+
+# ── Podman-managed volumes (only for stores without a host bind mount) ──────
+- name: Render the content storage volume unit
+  ansible.builtin.template:
+    src: quadlet/pulp-storage.volume.j2
+    dest: "{{ pulp_quadlet_dir }}/pulp-storage.volume"
+    mode: "0644"
+  when: pulp_storage_dir | length == 0
+  notify: Restart Pulp stack
+
+- name: Render the Redis data volume unit
+  ansible.builtin.template:
+    src: quadlet/pulp-redis-data.volume.j2
+    dest: "{{ pulp_quadlet_dir }}/pulp-redis-data.volume"
+    mode: "0644"
+  when: pulp_redis_data_dir | length == 0
+  notify:
+    - Restart Pulp stack
+    - Restart Pulp data stores
+
+- name: Render the PostgreSQL data volume unit
+  ansible.builtin.template:
+    src: quadlet/pulp-pg-data.volume.j2
+    dest: "{{ pulp_quadlet_dir }}/pulp-pg-data.volume"
+    mode: "0644"
+  when:
+    - not (pulp_postgres_external | bool)
+    - pulp_postgres_data_dir | length == 0
+  notify:
+    - Restart Pulp stack
+    - Restart Pulp data stores
+
+# ── Containers ──────────────────────────────────────────────────────────────
+# 0600: carries POSTGRES_PASSWORD in an Environment= line.
+- name: Render the PostgreSQL unit
+  ansible.builtin.template:
+    src: quadlet/pulp-postgres.container.j2
+    dest: "{{ pulp_quadlet_dir }}/pulp-postgres.container"
+    mode: "0600"
+  when: not (pulp_postgres_external | bool)
+  notify:
+    - Restart Pulp stack
+    - Restart Pulp data stores
+
+- name: Render the Redis unit
+  ansible.builtin.template:
+    src: quadlet/pulp-redis.container.j2
+    dest: "{{ pulp_quadlet_dir }}/pulp-redis.container"
+    mode: "0644"
+  notify:
+    - Restart Pulp stack
+    - Restart Pulp data stores
+
+- name: Render the migration unit
+  ansible.builtin.template:
+    src: quadlet/pulp-migration.container.j2
+    dest: "{{ pulp_quadlet_dir }}/pulp-migration.container"
+    mode: "0644"
+  notify: Restart Pulp stack
+
+- name: Render the signing service unit
+  ansible.builtin.template:
+    src: quadlet/pulp-signing.container.j2
+    dest: "{{ pulp_quadlet_dir }}/pulp-signing.container"
+    mode: "0644"
+  when: pulp_signing_enabled | bool
+  notify: Restart Pulp stack
+
+- name: Render the initial admin password unit
+  ansible.builtin.template:
+    src: quadlet/pulp-init-password.container.j2
+    dest: "{{ pulp_quadlet_dir }}/pulp-init-password.container"
+    mode: "0600"
+  when: pulp_set_init_password | bool
+  notify: Restart Pulp stack
+
+- name: Render the API unit
+  ansible.builtin.template:
+    src: quadlet/pulp-api.container.j2
+    dest: "{{ pulp_quadlet_dir }}/pulp-api.container"
+    mode: "0644"
+  notify: Restart Pulp stack
+
+- name: Render the content unit
+  ansible.builtin.template:
+    src: quadlet/pulp-content.container.j2
+    dest: "{{ pulp_quadlet_dir }}/pulp-content.container"
+    mode: "0644"
+  notify: Restart Pulp stack
+
+- name: Render one unit per task worker replica
+  ansible.builtin.template:
+    src: quadlet/pulp-worker.container.j2
+    dest: "{{ pulp_quadlet_dir }}/pulp-worker-{{ item }}.container"
+    mode: "0644"
+  loop: "{{ range(1, (pulp_worker_replicas | int) + 1) | list }}"
+  vars:
+    worker_index: "{{ item }}"
+  notify: Restart Pulp stack
+
+# ── Telemetry ───────────────────────────────────────────────────────────────
+# Notifies only the collector topic: a change here must not restart Pulp, and
+# the daemon-reload handler listens on this topic too.
+- name: Render the OpenTelemetry collector unit
+  ansible.builtin.template:
+    src: quadlet/otel-collector.container.j2
+    dest: "{{ pulp_quadlet_dir }}/otel-collector.container"
+    mode: "0644"
+  when: pulp_otel_collector_enabled | bool
+  notify: Restart Pulp collector
+
+# ── Reconcile: drop units this run did not render ───────────────────────────
+# Lowering pulp_worker_replicas, or turning signing / init-password off, leaves
+# a stale unit file behind. systemd would keep starting it (it still has an
+# [Install] symlink), so the container would linger — the compose path got this
+# for free via --remove-orphans. Stop the unit BEFORE deleting the file, or
+# daemon-reload forgets the unit while its container keeps running.
+- name: Build the list of units this run manages
+  ansible.builtin.set_fact:
+    pulp_quadlet_expected: >-
+      {{ ['pulp.network', 'pulp-redis.container', 'pulp-migration.container',
+          'pulp-api.container', 'pulp-content.container']
+         + (['pulp-postgres.container'] if not (pulp_postgres_external | bool) else [])
+         + (['pulp-storage.volume'] if pulp_storage_dir | length == 0 else [])
+         + (['pulp-redis-data.volume'] if pulp_redis_data_dir | length == 0 else [])
+         + (['pulp-pg-data.volume']
+            if not (pulp_postgres_external | bool) and pulp_postgres_data_dir | length == 0
+            else [])
+         + (['pulp-signing.container'] if pulp_signing_enabled | bool else [])
+         + (['pulp-init-password.container'] if pulp_set_init_password | bool else [])
+         + (['otel-collector.container'] if pulp_otel_collector_enabled | bool else [])
+         + (range(1, (pulp_worker_replicas | int) + 1)
+            | map('regex_replace', '^(.*)$', 'pulp-worker-\1.container') | list) }}
+
+- name: Find Quadlet units currently on the host
+  ansible.builtin.find:
+    paths: "{{ pulp_quadlet_dir }}"
+    patterns:
+      - "pulp*.container"
+      - "pulp*.volume"
+      - "pulp*.network"
+      # Not pulp-prefixed, so it needs its own pattern — without this, turning
+      # pulp_otel_collector_enabled back off would leave the unit running.
+      - "otel-collector.container"
+    file_type: file
+  register: pulp_quadlet_present
+
+- name: Identify orphaned units
+  ansible.builtin.set_fact:
+    pulp_quadlet_orphans: >-
+      {{ pulp_quadlet_present.files | map(attribute='path') | map('basename')
+         | reject('in', pulp_quadlet_expected) | list }}
+
+- name: Report orphaned units being removed
+  ansible.builtin.debug:
+    msg: >-
+      Removing Quadlet units no longer part of the desired state:
+      {{ pulp_quadlet_orphans | join(', ') }}
+  when: pulp_quadlet_orphans | length > 0
+
+# .container files map to <name>.service; .volume/.network map to
+# <name>-volume.service / <name>-network.service. Only container units have a
+# running process worth stopping — the volume/network units are pulled in as
+# dependencies and go away with their consumers.
+- name: Stop orphaned container units
+  ansible.builtin.systemd:
+    name: "{{ item | regex_replace('\\.container$', '.service') }}"
+    state: stopped
+  loop: "{{ pulp_quadlet_orphans | select('search', '\\.container$') | list }}"
+  failed_when: false
+  when: pulp_start_stack | bool
+
+- name: Remove orphaned unit files
+  ansible.builtin.file:
+    path: "{{ pulp_quadlet_dir }}/{{ item }}"
+    state: absent
+  loop: "{{ pulp_quadlet_orphans }}"
+  notify: Restart Pulp stack

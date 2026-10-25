@@ -1,0 +1,217 @@
+---
+# ── Prod environment ───────────────────────────────────────────────────────
+# Container engine: prod runs on Podman (daemonless, rootful via the play's
+# sudo). dev/staging stay on Docker (see roles/pulp/defaults/main.yml).
+pulp_container_engine: podman
+
+# Orchestrator: one systemd unit per container via Quadlet instead of
+# podman-compose. Prod already satisfies the prerequisites — pulp_web_enabled is
+# false (external nginx) and pulp_postgres_external is true (RDS) — so no
+# pulp_web/postgres units are needed, and api/content are single-instance behind
+# published host ports, which keeps nginx service-name DNS out of the picture.
+#
+# What this replaces: podman-restart.service + its RequiresMountsFor drop-in
+# (each unit now carries WantedBy=multi-user.target and its own
+# RequiresMountsFor=/data/pulp_root), and the whole-stack force-recreate on any
+# config change (now a targeted restart of api/content/workers).
+#
+# Set back to "compose" to fall back — the compose rendering is still maintained.
+# NOTE: switching is a cutover, not a rolling change (container names and the
+# network change). Stop the compose stack before the first Quadlet run:
+#   cd /opt/pulp && podman-compose -f compose.yml down
+# Data is safe across it: the content store is the /data/pulp_root bind mount and
+# the database is RDS.
+pulp_orchestrator: quadlet
+
+# ── Pulp version ─────────────────────────────────────────────────────────────
+# Pin the runtime image for prod. WARNING: raising this above the currently
+# deployed version makes migration_service run `pulpcore-manager migrate`
+# against the RDS on the next bring-up — a real, FORWARD-ONLY schema upgrade
+# (you cannot roll back to an older image afterward). Snapshot RDS first, and
+# expect the migration to take a while on a large database.
+pulp_image_tag: "3.114.1"
+
+# Apply the vendored pulpcore source patches (roles/pulp/files/*.py, listed in
+# pulp_source_patches): export.py fixes package file timestamps on export and
+# lets streamed file:// content be exported without a downloaded Artifact;
+# datarepair.py makes the datarepair-7272/7465 repair tasks stream content ids
+# one version at a time instead of OOMing on large repositories. This forces a
+# custom-image build (localhost/pulp-custom) layered on pulp-minimal. The set is
+# pinned to pulpcore pulp_source_patches_pulpcore_version (3.114.1) and the build
+# fails if that drifts from pulp_image_tag above — so when you raise the tag,
+# re-derive every patched file from the new upstream and bump the version var
+# (see roles/pulp/files/README.md).
+pulp_source_patches_enabled: true
+
+# Use an external PostgreSQL on AWS RDS — the bundled postgres container is NOT
+# deployed. Point the host at your RDS endpoint and provide the credentials.
+pulp_postgres_external: true
+# TODO(prod): replace with the real RDS endpoint.
+pulp_postgres_host: "pulp-prod.xxxxxxxx.eu-central-1.rds.amazonaws.com"
+pulp_postgres_port: 5432
+pulp_postgres_db: pulp
+pulp_postgres_user: pulp
+# sslmode left undefined -> omitted from settings.py; libpq defaults to "prefer"
+# (still negotiates TLS with RDS, just not client-enforced). Uncomment to pin it:
+# pulp_postgres_sslmode: require      # or "verify-full" + CA for strict checking
+# pulp_postgres_password: ...         # SET VIA ANSIBLE-VAULT (see below)
+
+# TODO(prod): replace pulp.example.com everywhere below with the real public FQDN.
+# Public hostname clients use to reach Pulp.
+pulp_content_origin: "https://pulp.example.com"
+# Public URLs Pulp advertises for its own API/content (pulp_ansible_* clients,
+# pulp_container token server). Default to compose-internal service names; prod
+# fronts them behind the public FQDN.
+pulp_ansible_api_hostname: "https://pulp.example.com"
+pulp_ansible_content_hostname: "https://pulp.example.com/pulp/content"
+pulp_token_server: "https://pulp.example.com/token/"
+
+# ── Reverse proxy / TLS ──────────────────────────────────────────────────────
+# TLS and routing are handled by the EXTERNAL nginx (separate host) that proxies
+# to the published api/content ports below — so the bundled pulp_web is disabled
+# and Pulp speaks plain HTTP internally. CONTENT_ORIGIN (pulp_content_origin
+# above) must be the public https URL so Pulp emits correct links even though it
+# sees http. The external nginx must route /pulp/content/ -> content port and
+# everything else -> api port (matching its `pulp` / `pulp-content` upstreams).
+pulp_web_enabled: false
+pulp_https: false
+pulp_api_host_port: 8081        # external nginx upstream "pulp"        (0.0.0.0:8081)
+pulp_content_host_port: 24816   # external nginx upstream "pulp-content" (0.0.0.0:24816)
+
+# One gunicorn instance per role (mirrors the old systemd pulpcore-api/-content
+# units); scale via gunicorn workers, not replicas (a published host port can't
+# fan out). Task workers have no port, so they scale by replica count.
+pulp_api_replicas: 1
+pulp_content_replicas: 1
+pulp_api_workers: 10            # old: pulpcore-api --workers 10
+pulp_content_workers: 20        # old: pulpcore-content --workers 20
+pulp_gunicorn_timeout: 300      # old: --timeout 300
+pulp_worker_replicas: 16        # old: pulpcore-worker@1..16
+
+# ── Logging ──────────────────────────────────────────────────────────────────
+# Services log to the host journal (default pulp_log_driver=journald). Manage
+# journald retention here so rotation is codified with the deployment. Budget is
+# GLOBAL to the journal (all services + replicas share it) — tune for the host's
+# root/journal filesystem, which is separate from the EFS content mount at /data.
+pulp_journald_configure: true
+pulp_journald_system_max_use: "4G"
+pulp_journald_max_retention_sec: "1month"
+
+# ── Metrics (OpenTelemetry) ──────────────────────────────────────────────────
+# Pulp's processes expose no HTTP endpoint, so the collector is the only thing
+# that can be scraped. It runs as otel-collector.container on the pulp network
+# and serves Prometheus on :8889 (collector self-metrics on :8888):
+#   scrape_configs:
+#     - job_name: pulp-prod
+#       static_configs:
+#         - targets: ['<prod-host>:8889']
+#
+# On 3.114.x this yields api.request_duration (ms histogram) from pulp-api's
+# DjangoMetricsMiddleware. artifacts.size.counter additionally needs
+# DOMAIN_ENABLED, which this role does not set, so pulp-content and the workers
+# emit nothing today — their OTel env is inert but kept for uniformity.
+#
+# SECURITY: :8889 and :8888 are published on 0.0.0.0 and UNAUTHENTICATED.
+# Restrict both to the Prometheus host in the security group. To avoid publishing
+# them, use pulp_otel_collector_metrics_endpoint to push over OTLP instead —
+# which needs Prometheus's OTLP receiver enabled.
+#
+# WARNING: turning this on re-renders the api/content/worker units, so the
+# handler restarts api, content and all 16 workers, and re-runs pulp-migration
+# (a no-op on an unchanged image). api/content are single-instance behind the
+# external nginx, so this is a real interruption — do it in a window.
+pulp_otel_enabled: true
+pulp_otel_collector_enabled: true
+
+# ── Data ───────────────────────────────────────────────────────────────────
+# Content storage. The whole EFS tree /data/pulp_root (an NFS mount on the host)
+# is bind-mounted into the containers at the SAME path, /data/pulp_root, and the
+# Pulp paths below are repointed under it: the real artifact store stays at
+# /data/pulp_root/pulp (its media/ + tmp/ subdirs) and PulpExport writes to the
+# sibling /data/pulp_root/exports.
+#
+# Why one shared-parent mount instead of the intuitive two (store -> /var/lib/pulp
+# + exports -> /data/pulp_root): PulpExport hardlinks (os.link) each artifact from
+# MEDIA_ROOT into the export dir. A hard link cannot cross filesystems. With two
+# separate bind mounts of the EFS export, the NFS client sees TWO mounts (separate
+# superblocks) inside the container — even though the host sees one filesystem —
+# and every export dies with "[Errno 18] Invalid cross-device link". Worse, both
+# mounts report the SAME st_dev, so the export.py patch's same-filesystem guard is
+# fooled and never falls back to copy. Mounting the shared parent ONCE puts
+# MEDIA_ROOT and the export dir under a single mount/superblock, so hardlinks work.
+# Postgres data is managed by RDS, so only the content store mounts.
+pulp_storage_dir: /data/pulp_root
+pulp_storage_mount: /data/pulp_root          # mount the store at its own host path
+pulp_deploy_root_host: /data/pulp_root/pulp  # host path of DEPLOY_ROOT (subdir base)
+
+# Pulp filesystem layout, repointed into the shared mount. MEDIA_ROOT stays the
+# physical artifact store (paths are stored relative to it, so the existing data
+# resolves unchanged); the rest live alongside it under /data/pulp_root/pulp.
+pulp_deploy_root: /data/pulp_root/pulp
+pulp_media_root: /data/pulp_root/pulp/media
+pulp_working_directory: /data/pulp_root/pulp/tmp
+pulp_file_upload_temp_dir: /data/pulp_root/pulp/tmp
+pulp_static_root: /data/pulp_root/pulp/assets
+
+# The existing data is owned by uid 1001 (host pulp:pulp-exports), while the
+# image's pulp user is uid 700. Run the services as the data owner so they have
+# native rwx without chowning the 49 TB tree, and align the role-managed
+# assets/certs ownership (settings, DB-encryption + token keys) to the same uid
+# so this user can still read them. The data tree itself is left untouched.
+pulp_run_user: "1001:1002"
+pulp_storage_owner: "1001"
+pulp_storage_group: "1002"
+
+# PulpExport/PulpImport. No SEPARATE exports bind mount (pulp_exports_dir empty):
+# the export dirs live under the single /data/pulp_root store mount above, which
+# is exactly what keeps them on the same filesystem as MEDIA_ROOT for hardlinks.
+# The whitelisted paths still have to be declared explicitly.
+pulp_exports_dir: ""
+pulp_export_path: /data/pulp_root/exports
+pulp_allowed_export_paths:
+  - /data/pulp_root/exports
+  - /data/pulp_root/test-exports
+pulp_allowed_import_paths:
+  - /data/pulp_root/exports
+  - /data/pulp_root/test-exports
+
+# SELinux is Permissive on the prod hosts, so the ":z"/":Z" relabel flags are
+# dead work — disable them on ALL bind mounts via the global toggle. This also
+# covers the EFS content store at /data: NFS can't store per-file SELinux labels
+# anyway, so the relabel would fail (EOPNOTSUPP) and recursively walk the whole
+# 49 TB tree on every start. If the hosts are ever switched to Enforcing, set
+# this back true and label the EFS mount itself instead, e.g. mount /data with
+# context="system_u:object_r:container_file_t:s0".
+pulp_selinux_relabel: false
+
+# ── Existing deployment ──────────────────────────────────────────────────────
+# Prod migrates an existing Pulp (RDS data + an admin user already present), so
+# do NOT run set_init_password_service — it would reset the current admin
+# password. (Consequently pulp_admin_password is unused and not required below.)
+pulp_set_init_password: false
+
+# Reuse the ORIGINAL DB-field encryption key from the existing deployment. A
+# freshly generated key would make already-encrypted RDS fields unreadable, so
+# generation is disabled and the key is copied in from the control node.
+# The original key is committed vault-encrypted (the copy module decrypts it
+# on the fly); the plaintext name is gitignored.
+pulp_generate_db_encryption_key: false
+pulp_db_encryption_key_src: files/database_fields.symmetric.key.vault
+
+# Bring the existing pulp_container token-auth ES256 keypair over too (settings
+# references these paths). Token auth is disabled in prod, so they're not
+# strictly required, but copying the originals matches the current deployment.
+# Committed vault-encrypted, like the DB key above. Leave both empty if you
+# don't have/need them.
+pulp_token_public_key_src: files/token_public_key.pem.vault
+pulp_token_private_key_src: files/token_private_key.pem.vault
+
+# ── Secrets ────────────────────────────────────────────────────────────────
+# DO NOT commit these in plaintext. Encrypt each value inline and paste here:
+#   ansible-vault encrypt_string '<rds password>'            --name pulp_postgres_password
+#   ansible-vault encrypt_string "$(openssl rand -base64 50)" --name pulp_secret_key
+# pulp_postgres_password: !vault | ...
+# pulp_secret_key: !vault | ...
+# (pulp_admin_password not needed — pulp_set_init_password is false.)
+# Then run with --ask-vault-pass (or --vault-password-file).
+# (Alternatively keep a separate encrypted file and pass it with -e @secrets/prod.yml.)

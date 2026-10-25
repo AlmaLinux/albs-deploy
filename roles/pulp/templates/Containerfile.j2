@@ -1,0 +1,35 @@
+# {{ ansible_managed }}
+# Custom Pulp image: layers local changes onto the upstream pulp-minimal image.
+# Built (roles/pulp/tasks/build_image.yml) whenever extra plugins are requested
+# OR vendored source patches are enabled.
+FROM {{ pulp_minimal_image }}
+
+USER root:root
+{% if pulp_extra_plugins %}
+
+# Install extra plugins that are NOT bundled in the upstream image.
+# /constraints.txt and uv ship in the base image; we reuse them so transitive
+# deps stay aligned with the bundled pulpcore.
+RUN uv pip install --no-cache \
+{% for plugin in pulp_extra_plugins %}
+  "{{ plugin }}"{{ " \\" }}
+{% endfor %}
+  -c /constraints.txt
+{% endif %}
+{% if pulp_source_patches_enabled | bool %}
+
+# Overlay the vendored pulpcore source patches. Pinned to pulpcore
+# {{ pulp_source_patches_pulpcore_version }} (asserted against pulp_image_tag at
+# build time); re-derive every roles/pulp/files/*.py patch on any version bump.
+{% for patch in pulp_source_patches %}
+COPY patches/{{ patch.src }} {{ patch.dest }}
+{% endfor %}
+{% endif %}
+{% if pulp_extra_plugins %}
+
+# Re-collect static assets so any UI/static files the new plugins ship are served.
+USER pulp:pulp
+RUN PULP_STATIC_ROOT=/var/lib/operator/static/ PULP_CONTENT_ORIGIN=localhost \
+      /usr/local/bin/pulpcore-manager collectstatic --clear --noinput --link
+USER root:root
+{% endif %}

@@ -1,0 +1,197 @@
+---
+- name: Create the compose project directory tree
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: "0755"
+  loop:
+    - "{{ pulp_project_dir }}"
+    - "{{ pulp_assets_dir }}"
+    - "{{ pulp_assets_dir }}/bin"
+    - "{{ pulp_assets_dir }}/nginx"
+    - "{{ pulp_assets_dir }}/postgres"
+    - "{{ pulp_assets_dir }}/certs"
+    - "{{ pulp_assets_dir }}/otel"
+
+- name: Install the pulp-web nginx launcher script
+  ansible.builtin.copy:
+    src: nginx.sh
+    dest: "{{ pulp_assets_dir }}/bin/nginx.sh"
+    mode: "0755"
+  notify: Restart Pulp stack
+  when: pulp_web_enabled | bool
+
+- name: Render the nginx config template
+  ansible.builtin.template:
+    src: nginx.conf.template.j2
+    dest: "{{ pulp_assets_dir }}/nginx/nginx.conf.template"
+    mode: "0644"
+  notify: Restart Pulp stack
+  when: pulp_web_enabled | bool
+
+# Mounted into the collector only, so a change here restarts just the collector
+# — not the Pulp services, which never read it.
+- name: Render the OpenTelemetry collector config
+  ansible.builtin.template:
+    src: otel-collector-config.yaml.j2
+    dest: "{{ pulp_assets_dir }}/otel/config.yaml"
+    mode: "0644"
+  notify: Restart Pulp collector
+  when: pulp_otel_collector_enabled | bool
+
+- name: Install the postgres passwd file
+  ansible.builtin.copy:
+    src: passwd
+    dest: "{{ pulp_assets_dir }}/postgres/passwd"
+    mode: "0644"
+
+# ── Bind-mount data directories (migration from systemd) ────────────────────
+- name: Ensure host data directories exist for bind mounts
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+  loop: "{{ [pulp_storage_dir, pulp_postgres_data_dir, pulp_redis_data_dir, pulp_exports_dir] | select | list }}"
+
+- name: Set ownership on the exports bind mount (in-container pulp uid/gid)
+  ansible.builtin.file:
+    path: "{{ pulp_exports_dir }}"
+    owner: "{{ pulp_storage_owner }}"
+    group: "{{ pulp_storage_group }}"
+  when: pulp_exports_dir | length > 0
+
+# A bind-mounted store shadows the subdirectories the image pre-creates under
+# DEPLOY_ROOT, so pulpcore's startup check fails (files.E001: <root>/tmp missing).
+# Recreate them with the in-container pulp uid/gid. pulp_deploy_root_host is the
+# host path of DEPLOY_ROOT (defaults to the storage bind source; differs in the
+# shared-parent layout). (Named-volume mode is fine.)
+- name: Ensure pulp storage subdirectories exist on the bind mount
+  ansible.builtin.file:
+    path: "{{ pulp_deploy_root_host }}/{{ item }}"
+    state: directory
+    owner: "{{ pulp_storage_owner }}"
+    group: "{{ pulp_storage_group }}"
+    mode: "2775"
+  loop:
+    - tmp
+    - media
+    - assets
+    - scripts
+  when: pulp_storage_dir | length > 0
+
+- name: Set ownership on the pulp storage bind mount (in-container pulp uid/gid)
+  ansible.builtin.file:
+    path: "{{ pulp_storage_dir }}"
+    owner: "{{ pulp_storage_owner }}"
+    group: "{{ pulp_storage_group }}"
+    recurse: true
+  when:
+    - pulp_storage_dir | length > 0
+    - pulp_storage_set_owner | bool
+
+# ── TLS material ─────────────────────────────────────────────────────────────
+- name: Provision TLS certificate
+  ansible.builtin.include_tasks: tls.yml
+  when: pulp_https | bool
+
+# ── Database fields encryption (Fernet) key ─────────────────────────────────
+# Provided key wins (migration: reuse the ORIGINAL key). Otherwise generate one
+# only for a new deployment. A missing key with generation disabled is fatal.
+- name: Install the provided database fields encryption key
+  ansible.builtin.copy:
+    src: "{{ pulp_db_encryption_key_src }}"
+    dest: "{{ pulp_assets_dir }}/certs/database_fields.symmetric.key"
+    mode: "0640"
+    force: false
+  when: pulp_db_encryption_key_src | length > 0
+  notify: Restart Pulp stack
+
+# Write the Fernet key straight to the file (only when absent), so its content
+# is never the command's stdout/skip message. 32 random bytes, base64-encoded.
+- name: Generate the database fields encryption key
+  ansible.builtin.shell:
+    cmd: "openssl rand -base64 32 > {{ pulp_assets_dir }}/certs/database_fields.symmetric.key"
+    creates: "{{ pulp_assets_dir }}/certs/database_fields.symmetric.key"
+  when:
+    - pulp_generate_db_encryption_key | bool
+    - pulp_db_encryption_key_src | length == 0
+  notify: Restart Pulp stack
+
+- name: Check the database fields encryption key is present
+  ansible.builtin.stat:
+    path: "{{ pulp_assets_dir }}/certs/database_fields.symmetric.key"
+  register: pulp_db_key_stat
+
+- name: Fail when the database fields encryption key is missing
+  ansible.builtin.assert:
+    that: pulp_db_key_stat.stat.exists
+    fail_msg: >-
+      No database fields encryption key at
+      {{ pulp_assets_dir }}/certs/database_fields.symmetric.key and generation is
+      disabled. For an existing deployment provide the ORIGINAL key via
+      pulp_db_encryption_key_src (or pre-place it on the host) — a new/wrong key
+      makes already-encrypted DB fields permanently unreadable.
+
+- name: Enforce permissions on the database fields encryption key
+  ansible.builtin.file:
+    path: "{{ pulp_assets_dir }}/certs/database_fields.symmetric.key"
+    owner: "{{ pulp_storage_owner }}"
+    group: "{{ pulp_storage_group }}"
+    mode: "0640"
+
+# ── pulp_container token auth ES256 keypair ─────────────────────────────────
+# Copied in only when a source is provided (e.g. migrating an existing
+# deployment). Unused when token auth is disabled.
+- name: Install the token auth public key
+  ansible.builtin.copy:
+    src: "{{ pulp_token_public_key_src }}"
+    dest: "{{ pulp_assets_dir }}/certs/token_public_key.pem"
+    owner: "{{ pulp_storage_owner }}"
+    group: "{{ pulp_storage_group }}"
+    mode: "0644"
+    force: false
+  when: pulp_token_public_key_src | length > 0
+  notify: Restart Pulp stack
+
+- name: Install the token auth private key
+  ansible.builtin.copy:
+    src: "{{ pulp_token_private_key_src }}"
+    dest: "{{ pulp_assets_dir }}/certs/token_private_key.pem"
+    owner: "{{ pulp_storage_owner }}"
+    group: "{{ pulp_storage_group }}"
+    mode: "0640"
+    force: false
+  when: pulp_token_private_key_src | length > 0
+  notify: Restart Pulp stack
+
+- name: Check the token auth keypair is present (when token auth enabled)
+  ansible.builtin.stat:
+    path: "{{ pulp_assets_dir }}/certs/{{ item }}"
+  loop:
+    - token_public_key.pem
+    - token_private_key.pem
+  register: pulp_token_key_stat
+  when: not (pulp_token_auth_disabled | bool)
+
+- name: Fail when token auth is enabled but the keypair is missing
+  ansible.builtin.assert:
+    that: pulp_token_key_stat.results | map(attribute='stat.exists') | select | list | length == 2
+    fail_msg: >-
+      pulp_token_auth_disabled is false but the ES256 keypair is missing. Provide
+      it via pulp_token_public_key_src / pulp_token_private_key_src (or pre-place
+      token_{public,private}_key.pem in {{ pulp_assets_dir }}/certs).
+  when: not (pulp_token_auth_disabled | bool)
+
+- name: Render Pulp settings.py
+  ansible.builtin.template:
+    src: settings.py.j2
+    dest: "{{ pulp_assets_dir }}/settings.py"
+    mode: "0644"
+  notify: Restart Pulp stack
+
+- name: Render the compose file
+  ansible.builtin.template:
+    src: compose.yml.j2
+    dest: "{{ pulp_project_dir }}/compose.yml"
+    mode: "0644"
+  when: pulp_orchestrator == 'compose'
+  notify: Restart Pulp stack
