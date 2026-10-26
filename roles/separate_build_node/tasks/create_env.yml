@@ -49,12 +49,24 @@
   become_user: "{{ service_user }}"
   ansible.builtin.command: "{{ build_node_venv_directory }}/bin/pip install --upgrade pip"
 
+- name: Install s390x build requirements into virtualenv
+  become: yes
+  become_user: "{{ service_user }}"
+  ansible.builtin.pip:
+    name: "{{ build_node_s390x_build_requirements }}"
+    virtualenv: "{{ build_node_venv_directory }}"
+  when: ansible_facts['architecture'] == 's390x'
+  tags:
+    - update-env
+
 - name: Install requirements into virtualenv
   become: yes
   become_user: "{{ service_user }}"
   ansible.builtin.pip:
     requirements: "{{ build_node_requirements_path }}"
     virtualenv: "{{ build_node_venv_directory }}"
+    extra_args: "{{ '--no-build-isolation' if ansible_facts['architecture'] == 's390x' else omit }}"
+  environment: "{{ build_node_s390x_pip_environment if ansible_facts['architecture'] == 's390x' else {} }}"
   tags:
     - update-env
 ...

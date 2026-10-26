@@ -17,4 +17,17 @@ working_directories:
   - "{{ base_work_dir }}/castor/build_node"
   - "{{ base_work_dir }}/castor/build_node/mock_configs"
   - "{{ final_conf_dir }}"
+# s390x builds requirements from source without build isolation:
+# grpcio 1.58 setup.py needs pkg_resources (removed in setuptools 81),
+# git deps with PEP 621 metadata need setuptools>=61 (system one is 53
+# and satisfies a bare "<81" via --system-site-packages)
+build_node_s390x_build_requirements:
+  - "setuptools>=61,<81"
+  - "cython<3"
+  - "wheel"
+build_node_s390x_pip_environment:
+  GRPC_PYTHON_BUILD_SYSTEM_OPENSSL: "1"
+  GRPC_PYTHON_BUILD_SYSTEM_ZLIB: "1"
+  GRPC_PYTHON_BUILD_SYSTEM_CARES: "1"
+  GRPC_PYTHON_BUILD_EXT_COMPILER_JOBS: "1"
 ...
