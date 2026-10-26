@@ -32,4 +32,10 @@ build_node_dnf_packages:
   - "ubu-keyring"
   - "xmlsec1-openssl-devel"
   - "rsyslog-logrotate"
+# s390x has no prebuilt wheels for some requirements (e.g. grpcio),
+# they are compiled against these system libraries
+build_node_s390x_dnf_packages:
+  - "c-ares-devel"
+  - "openssl-devel"
+  - "zlib-devel"
 ...
