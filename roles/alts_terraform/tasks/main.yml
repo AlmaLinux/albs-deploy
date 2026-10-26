@@ -46,6 +46,8 @@
   ansible.builtin.shell: |
     cd /tmp/terraform
     GOBIN="/usr/local/bin/" go install .
+  environment:
+    GOTOOLCHAIN: auto
   when: build_terraform is defined
   tags:
     - build-terraform
@@ -65,7 +67,7 @@
   ansible.builtin.git:
     repo: https://github.com/kreuzwerker/terraform-provider-docker.git
     dest: /tmp/docker-provider
-    version: v"{{ docker_build_ver }}"
+    version: "v{{ docker_build_ver }}"
   when: build_terraform is defined
   tags:
     - build-terraform
@@ -85,6 +87,8 @@
   ansible.builtin.shell: |
     cd /tmp/docker-provider
     go build -o /home/{{ test_system_user }}/.terraform.d/plugins-cache/registry.terraform.io/kreuzwerker/docker/{{ docker_build_ver }}/linux_{{ node_arch }}/terraform-provider-docker_{{ docker_build_ver }}
+  environment:
+    GOTOOLCHAIN: auto
   when: build_terraform is defined
   tags:
     - build-terraform
