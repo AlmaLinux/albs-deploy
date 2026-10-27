@@ -6,24 +6,43 @@
     state: present
   when: build_terraform is not defined
 
+- name: Get installed Terraform version
+  ansible.builtin.command: /usr/local/bin/terraform version -json
+  register: terraform_installed
+  changed_when: false
+  failed_when: false
+  check_mode: false
+  when: build_terraform is not defined
+
+- name: Check whether Terraform needs to be installed
+  ansible.builtin.set_fact:
+    terraform_install_needed: >-
+      {{ terraform_installed.rc != 0
+         or (terraform_installed.stdout | from_json).terraform_version != terraform_version }}
+  when: build_terraform is not defined
+
 - name: Download Terraform
   ansible.builtin.get_url:
     url: "https://releases.hashicorp.com/terraform/{{ terraform_version }}/terraform_{{ terraform_version }}_linux_{{ terraform_arch }}.zip"
     dest: /tmp/terraform.zip
-  when: build_terraform is not defined
+  when: build_terraform is not defined and terraform_install_needed | bool
 
+# get_url doesn't download in check mode, so there is nothing to unpack
 - name: Unpack Terraform
   ansible.builtin.unarchive:
     src: /tmp/terraform.zip
     dest: /usr/local/bin
     remote_src: yes
-  when: build_terraform is not defined
+  when:
+    - build_terraform is not defined
+    - terraform_install_needed | bool
+    - not ansible_check_mode
 
 - name: Delete archive
   ansible.builtin.file:
     path: /tmp/terraform.zip
     state: absent
-  when: build_terraform is not defined
+  when: build_terraform is not defined and terraform_install_needed | bool
 
 - name: Install golang
   ansible.builtin.yum:
