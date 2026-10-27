@@ -9,3 +9,4 @@ collections:
   - name: community.docker
   - name: ansible.posix
   - name: community.general
+  - name: community.rabbitmq
