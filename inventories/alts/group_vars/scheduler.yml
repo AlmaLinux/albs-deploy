@@ -54,6 +54,15 @@ scheduler_working_directory: /srv/alts/scheduler
 flower_port: 5555
 # flower_password: ""  # Required, pass via --extra-vars or a vaulted vars file
 jwt_secret: very-secret-on5
+# Route matching tasks to another queue architecture. Only workers whose
+# celery_queues include the target queue (e.g. docker-x86_64_v3-0) get them,
+# so deploy such a worker before enabling an override.
+# AlmaLinux 10 x86_64 images need an x86-64-v3 (AVX2) CPU
+queue_arch_overrides:
+  - dist_name: almalinux
+    dist_versions: ['10']
+    arch: x86_64
+    queue_arch: x86_64_v3
 broker_pool: 30
 worker_prefetch_multiplier: 1
 result_expires: 3600

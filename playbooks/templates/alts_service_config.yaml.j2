@@ -70,6 +70,18 @@ worker_prefetch_multiplier: {{ worker_prefetch_multiplier }}
 result_expires: {{ result_expires }}
 {% if alts_service | default('') == 'scheduler' %}
 jwt_secret: "{{ jwt_secret }}"
+{% if queue_arch_overrides is defined %}
+queue_arch_overrides:
+{% for override in queue_arch_overrides %}
+  - dist_name: "{{ override.dist_name }}"
+    dist_versions:
+{% for version in override.dist_versions %}
+      - "{{ version }}"
+{% endfor %}
+    arch: "{{ override.arch }}"
+    queue_arch: "{{ override.queue_arch }}"
+{% endfor %}
+{% endif %}
 {% endif %}
 
 {% if buildsys_url | default('') %}
