@@ -1,4 +1,13 @@
 ---
+{# The scheduler reaches the broker and Redis over different addresses
+   than the workers, which get rabbitmq_host/alts_redis_host #}
+{% if alts_service | default('') == 'scheduler' %}
+{% set broker_host = scheduler_rabbitmq_host %}
+{% set redis_host = scheduler_redis_host %}
+{% else %}
+{% set broker_host = rabbitmq_host %}
+{% set redis_host = alts_redis_host | default('') %}
+{% endif %}
 {% if celery_ssl %}
 use_ssl: true
 ssl_config:
@@ -9,7 +18,7 @@ ssl_config:
 
 broker_config:
 {% if broker_type == 'rabbitmq' %}
-  rabbitmq_host: {{ rabbitmq_host }}
+  rabbitmq_host: {{ broker_host }}
   rabbitmq_port: {{ rabbitmq_port }}
 {% if celery_ssl %}
   use_ssl: true
@@ -18,8 +27,8 @@ broker_config:
   rabbitmq_user: {{ celery_rabbitmq_user | default(test_system_user, true) }}
   rabbitmq_password: {{ test_system_password }}
   rabbitmq_vhost: {{ test_system_vhost }}
-{% elif broker_type == 'redis' and alts_redis_host and alts_redis_port %}
-  redis_host: "{{ alts_redis_host }}"
+{% elif broker_type == 'redis' and redis_host and alts_redis_port %}
+  redis_host: "{{ redis_host }}"
   redis_port: {{ alts_redis_port }}
   redis_db_number: {{ alts_redis_results_db | default(0) }}
 {% if redis_requirepass %}
@@ -42,8 +51,8 @@ results_backend_config:
   s3_base_path: 'celery_result_backend/'
   s3_region: {{ s3_region }}
   s3_endpoint_url:
-{% elif result_backend_name == 'redis' and alts_redis_host and alts_redis_port %}
-  redis_host: "{{ alts_redis_host }}"
+{% elif result_backend_name == 'redis' and redis_host and alts_redis_port %}
+  redis_host: "{{ redis_host }}"
   redis_port: {{ alts_redis_port }}
   redis_db_number: {{ alts_redis_results_db | default(1) }}
 {% if redis_requirepass %}
@@ -61,6 +70,18 @@ worker_prefetch_multiplier: {{ worker_prefetch_multiplier }}
 result_expires: {{ result_expires }}
 {% if alts_service | default('') == 'scheduler' %}
 jwt_secret: "{{ jwt_secret }}"
+{% if queue_arch_overrides is defined %}
+queue_arch_overrides:
+{% for override in queue_arch_overrides %}
+  - dist_name: "{{ override.dist_name }}"
+    dist_versions:
+{% for version in override.dist_versions %}
+      - "{{ version }}"
+{% endfor %}
+    arch: "{{ override.arch }}"
+    queue_arch: "{{ override.queue_arch }}"
+{% endfor %}
+{% endif %}
 {% endif %}
 
 {% if buildsys_url | default('') %}
