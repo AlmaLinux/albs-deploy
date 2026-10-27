@@ -11,3 +11,10 @@ flower_env_file: /etc/sysconfig/alts-flower
 flower_user: alts-mon
 # Must be set, Flower UI allows revoking tasks and controlling workers
 flower_password: ""
+# Seconds after which offline workers are removed from the dashboard
+flower_purge_offline_workers: 1800
+# Keep workers/tasks state across Flower restarts
+flower_persistent: true
+flower_db: /home/{{ test_system_user }}/flower_db
+# Milliseconds between state saves; 0 saves only on clean shutdown
+flower_state_save_interval: 60000
