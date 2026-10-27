@@ -78,7 +78,7 @@
     owner: "{{ test_system_user }}"
     group: "{{ test_system_user }}"
     state: directory
-  when: scheduler_working_directory is defined and scheduler_working_directory
+  when: scheduler_working_directory | default('') | length > 0
 
 - name: Install firewalld
   yum:
