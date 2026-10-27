@@ -21,6 +21,7 @@ roles/pulp/files/*.pem
 roles/pulp/files/*.crt
 
 # Caches
+.ansible/
 .mypy_cache/
 __pycache__/
 *.py[cod]

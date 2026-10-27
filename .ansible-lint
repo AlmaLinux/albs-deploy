@@ -1,0 +1,19 @@
+---
+# Violations that existed when linting was introduced are listed in
+# .ansible-lint-ignore, new code has to pass the 'basic' profile.
+# To shrink the baseline, fix the issues and remove the matching lines.
+profile: basic
+
+exclude_paths:
+  - .ansible/
+  - .github/
+  - cron_jobs/
+  - systemd_templates/
+  - roles/ezamriy.fail2ban/
+  - roles/geerlingguy.docker/
+  - roles/geerlingguy.redis/
+  - "*.tmpl"
+
+skip_list:
+  # Role variables are shared between roles and inventories by design
+  - var-naming[no-role-prefix]

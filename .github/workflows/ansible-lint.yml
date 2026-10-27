@@ -1,0 +1,43 @@
+name: 'Ansible Checks'
+on:
+  pull_request:
+  push:
+    branches:
+      - master
+
+jobs:
+  ansible-lint:
+    name: ansible-lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install ansible-lint
+        run: pip install ansible-lint==26.10.1
+      # Also runs yamllint (.yamllint) and syntax-checks the playbooks,
+      # Galaxy dependencies from requirements.yml are installed on the fly
+      - name: Run ansible-lint
+        run: ansible-lint
+
+  inventories:
+    name: Inventories
+    runs-on: ubuntu-latest
+    env:
+      # ansible-inventory only warns about unparseable sources by default
+      ANSIBLE_INVENTORY_ANY_UNPARSED_IS_FAILED: 'true'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install Ansible
+        run: pip install ansible-core
+      - name: Parse every inventory
+        run: |
+          for inventory in inventories/*/; do
+            echo "::group::${inventory}"
+            ansible-inventory -i "${inventory}" --graph
+            echo "::endgroup::"
+          done

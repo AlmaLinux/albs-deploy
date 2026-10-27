@@ -199,6 +199,17 @@ Do you want to contribute with source code?
 3. Write your change
 4. Submit a pull request
 
+Pull requests are checked with `ansible-lint` (which also runs `yamllint`
+and syntax-checks the playbooks) and every inventory has to parse. To run
+the same checks locally from the repository root:
+```bash
+pip install ansible-lint==26.10.1
+ansible-lint
+ANSIBLE_INVENTORY_ANY_UNPARSED_IS_FAILED=true ansible-inventory -i inventories/alts --graph
+```
+Violations that already existed are listed in `.ansible-lint-ignore`,
+new code has to pass. When fixing old ones, remove their lines from that file.
+
 ## License
 albs-deploy is licensed under the MIT License, see `LICENSE`. Exception: the
 vendored pulpcore modules `roles/pulp/files/export.py` and
