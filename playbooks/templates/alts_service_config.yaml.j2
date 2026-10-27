@@ -117,7 +117,13 @@ cleanup_yum_conf_docs_settings: {{ cleanup_yum_conf_docs_settings | bool }}
 ignore_ansible_install_errors: {{ ignore_ansible_install_errors | bool }}
 {% endif %}
 {% if docker_image_overrides is defined %}
-docker_image_overrides: {{ docker_image_overrides | to_json }}
+docker_image_overrides:
+{% for override in docker_image_overrides %}
+  - dist_name: "{{ override.dist_name }}"
+    dist_versions: {{ override.dist_versions | map('string') | list | to_json }}
+    platform: "{{ override.platform }}"
+    image: "{{ override.image }}"
+{% endfor %}
 {% endif %}
 {% if worker_type == 'opennebula' %}
 tests_base_dir: "{{ opennebula_tests_base_dir }}"

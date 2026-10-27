@@ -1,0 +1,9 @@
+---
+
+# i686 tasks run on x86_64 workers, pull native i386 images for them
+# instead of falling back to x86_64 ones (no multilib depsolving issues)
+docker_image_overrides:
+  - dist_name: almalinux
+    dist_versions: ['8', '9', '10']
+    platform: linux/386
+    image: quay.io/almalinuxautobot/almalinux
