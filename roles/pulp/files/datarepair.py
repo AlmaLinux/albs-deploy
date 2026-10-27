@@ -1,3 +1,13 @@
+# SPDX-License-Identifier: GPL-2.0-or-later
+#
+# Based on pulpcore 3.114.1, pulpcore/app/tasks/datarepair.py
+# (https://github.com/pulp/pulpcore), licensed under GPL-2.0-or-later,
+# see COPYING.pulpcore in this directory.
+#
+# Modified by the AlmaLinux OS Foundation, 2026:
+# - repair_7272 and repair_7465 load one repository version at a time and
+#   stream content ids instead of loading every version's content_ids at once
+
 from logging import getLogger
 
 from django.db import transaction

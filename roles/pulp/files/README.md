@@ -36,7 +36,7 @@ of `pulp_source_patches` (`{src, dest}`) into the image build context and
 
 | File            | Upstream module                    | What it changes |
 |-----------------|------------------------------------|-----------------|
-| `export.py`     | `pulpcore/app/tasks/export.py`     | Package file timestamps on export; export streamed `file://` content without a downloaded Artifact. |
+| `export.py`     | `pulpcore/app/tasks/export.py`     | Sets exported package file timestamps from the package metadata; allows exporting into an existing directory. (Exporting streamed `file://` content is already upstream in 3.114.1.) |
 | `datarepair.py` | `pulpcore/app/tasks/datarepair.py` | `repair_7272` / `repair_7465` (`pulpcore-manager datarepair-7272` / `-7465`) load one RepositoryVersion at a time, compare `content_ids` by count first and then stream relationship ids, and in 7465 only load versions whose cache is missing — so the repair no longer OOMs on repositories with many versions or huge `content_ids` arrays. |
 
 Each file vendors the whole module, so the set is pinned to ONE pulpcore version
@@ -48,6 +48,18 @@ var (or disable the patches).
 To add another patch: drop the patched module here and append
 `{src: <file>, dest: <path inside image>}` to `pulp_source_patches` in
 `roles/pulp/defaults/main.yml`.
+
+### License
+
+pulpcore is licensed under GPL-2.0-or-later, and so are these files as works
+based on it — unlike the rest of this repository, which is MIT. Keep for every
+vendored module:
+
+- the `SPDX-License-Identifier: GPL-2.0-or-later` header and the note naming
+  the upstream module and pulpcore version it is based on;
+- the list of our modifications with the year, updated whenever the file
+  changes (GPLv2 §2a);
+- `COPYING.pulpcore`, the GPLv2 text shipped with pulpcore.
 
 ### Filesystem exporter and hardlinks (cross-device gotcha)
 
