@@ -198,3 +198,9 @@ Do you want to contribute with source code?
 2. Create a new feature branch
 3. Write your change
 4. Submit a pull request
+
+## License
+albs-deploy is licensed under the MIT License, see `LICENSE`. Exception: the
+vendored pulpcore modules `roles/pulp/files/export.py` and
+`roles/pulp/files/datarepair.py` are modified copies of pulpcore source and are
+licensed under GPL-2.0-or-later, see `roles/pulp/files/COPYING.pulpcore`.

@@ -1,3 +1,13 @@
+# SPDX-License-Identifier: GPL-2.0-or-later
+#
+# Based on pulpcore 3.114.1, pulpcore/app/tasks/export.py
+# (https://github.com/pulp/pulpcore), licensed under GPL-2.0-or-later,
+# see COPYING.pulpcore in this directory.
+#
+# Modified by the AlmaLinux OS Foundation, 2026:
+# - set exported package file timestamps from the package metadata
+# - allow exporting into an existing directory
+
 import json
 import logging
 import os

@@ -90,8 +90,8 @@ pulp_custom_image_name: "localhost/pulp-custom:latest"
 # Overlay locally-patched pulpcore modules onto the image. Each entry in
 # pulp_source_patches is a file under roles/pulp/files/ (src) and its
 # destination inside the image (dest). Currently carried:
-#   export.py     — fixes package file timestamps on export and lets streamed
-#                   file:// content be exported without a downloaded Artifact.
+#   export.py     — fixes package file timestamps on export and allows
+#                   exporting into an existing directory.
 #   datarepair.py — makes repair_7272 / repair_7465 (pulpcore-manager
 #                   datarepair-*) load one RepositoryVersion at a time and
 #                   stream content ids, so they no longer OOM on repositories
