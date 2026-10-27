@@ -9,7 +9,9 @@ test_system_vhost: alts
 test_system_password: some-another-secret-password
 test_system_config_dir: ~/.config/alts
 
-rabbitmq_host: localhost
+# Scheduler-specific so that rabbitmq_host/alts_redis_host from extra vars,
+# which carry the addresses the workers use, don't apply to the scheduler
+scheduler_rabbitmq_host: localhost
 rabbitmq_port: 5672
 rabbitmq_ssl_port: 5671
 
@@ -31,7 +33,7 @@ redis_port: 6379
 
 # Celery result backend configuration
 result_backend_name: redis
-alts_redis_host: localhost
+scheduler_redis_host: localhost
 alts_redis_port: 6379
 alts_redis_results_db: 1
 
