@@ -7,3 +7,7 @@ docker_image_overrides:
     dist_versions: ['8', '9', '10']
     platform: linux/386
     image: quay.io/almalinuxautobot/almalinux
+
+# EPEL "ansible" needs ansible-core from AppStream, which the i686 repos
+# don't ship, so don't fail i686 provisioning on it
+ignore_ansible_install_errors: true
