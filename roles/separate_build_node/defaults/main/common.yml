@@ -20,11 +20,15 @@ working_directories:
 # s390x builds requirements from source without build isolation:
 # grpcio 1.58 setup.py needs pkg_resources (removed in setuptools 81),
 # git deps with PEP 621 metadata need setuptools>=61 (system one is 53
-# and satisfies a bare "<81" via --system-site-packages)
+# and satisfies a bare "<81" via --system-site-packages),
+# cryptography (pulled by google-auth) is a Rust sdist built with maturin
+# and needs cffi>=2 (system one is 1.14)
 build_node_s390x_build_requirements:
   - "setuptools>=61,<81"
   - "cython<3"
   - "wheel"
+  - "maturin>=1.9.4,<2"
+  - "cffi>=2.0.0"
 build_node_s390x_pip_environment:
   GRPC_PYTHON_BUILD_SYSTEM_OPENSSL: "1"
   GRPC_PYTHON_BUILD_SYSTEM_ZLIB: "1"
