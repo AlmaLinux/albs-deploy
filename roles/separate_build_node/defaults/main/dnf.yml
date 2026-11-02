@@ -36,6 +36,7 @@ build_node_dnf_packages:
 # they are compiled against these system libraries
 build_node_s390x_dnf_packages:
   - "c-ares-devel"
+  - "libffi-devel"
   - "openssl-devel"
   - "zlib-devel"
 ...
