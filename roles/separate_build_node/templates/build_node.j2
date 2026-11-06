@@ -3,6 +3,9 @@ master_url: "{{ albs_api_url }}"
 threads_count: {{ threads_count | default(4) }}
 base_arch: "{{ machine_arch }}"
 build_src: {{ build_src | default(True) }}
+{% if numa_aware is defined %}
+numa_aware: {{ numa_aware }}
+{% endif %}
 {% if exclusions_url is defined and exclusions_url %}
 exclusions_url: "{{ exclusions_url }}"
 {% endif %}
