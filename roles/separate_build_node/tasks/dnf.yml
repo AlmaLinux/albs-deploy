@@ -36,12 +36,15 @@
       - "{{ powertools_repository_name }}"
     update_cache: yes
 
-- name: Install s390x build dependencies for Python packages
+- name: Install source build dependencies for Python packages
   become: yes
   ansible.builtin.dnf:
     name: "{{ build_node_s390x_dnf_packages }}"
     state: latest
     enablerepo:
       - "{{ powertools_repository_name }}"
-  when: ansible_facts['architecture'] == 's390x'
+  when: build_node_build_from_source | bool
+  tags:
+    - update
+    - update-env
 ...

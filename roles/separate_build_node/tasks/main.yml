@@ -1,9 +1,31 @@
 ---
 - name: Deploy build node on a separate machine
+  # Most tasks need root (systemd units, dnf, sudoers, other users' homes);
+  # don't rely on the host connecting as root. Tasks that must run as the
+  # service user set become_user themselves.
+  become: true
   block:
+    # grpcio override and source-build tasks need the architecture fact;
+    # gather it if facts were not collected for this play.
+    - name: Gather platform facts if missing
+      ansible.builtin.setup:
+        gather_subset:
+          - "!all"
+      when: "'architecture' not in ansible_facts"
+      tags:
+        - always
     - include_tasks: dnf.yml
+      tags:
+        - update
+        - update-env
     - include_tasks: common.yml
+    # Tags on include_tasks apply only to the include itself, so tasks inside
+    # create_env.yml / install_systemd_service.yml carry their own 'update' tag.
     - include_tasks: create_env.yml
+      tags:
+        - update
+        - update-env
+        - update-config
     - include_tasks:
         file: pesign.yml
         apply:
@@ -11,5 +33,11 @@
             - pesign
       tags:
         - pesign
-    - include_tasks: install_systemd_service.yml
+    - include_tasks:
+        file: install_systemd_service.yml
+        apply:
+          tags:
+            - update
+      tags:
+        - update
 ...

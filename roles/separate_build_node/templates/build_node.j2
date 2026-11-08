@@ -9,10 +9,17 @@ numa_aware: {{ numa_aware }}
 {% if exclusions_url is defined and exclusions_url %}
 exclusions_url: "{{ exclusions_url }}"
 {% endif %}
+{% if working_dir is defined and working_dir %}
+working_dir: "{{ working_dir }}"
+{% endif %}
+{% if mock_basedir is defined and mock_basedir %}
+mock_basedir: "{{ mock_basedir }}"
+{% endif %}
 jwt_token: "{{ albs_jwt_token }}"
 pulp_host: "{{ pulp_host }}"
 pulp_user: "{{ pulp_user }}"
 pulp_password: "{{ pulp_password }}"
+pulp_chunk_size: {{ pulp_chunk_size | default(52428800) }}
 pulp_uploader_max_workers: {{ pulp_uploader_workers | default(2) }}
 {% if sentry_dsn is defined and sentry_dsn %}
 sentry_dsn: "{{ sentry_dsn }}"

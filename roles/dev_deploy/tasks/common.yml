@@ -63,6 +63,7 @@
 - name: Set albs_jwt when is not set via vars.yml
   tags:
     - jwt_tokens
+    - update
     - albs_jwt_token
   block:
     - name: Generate ALBS JWT
@@ -80,6 +81,7 @@
 - name: Set albs_jwt when is set via vars.yml
   tags:
     - jwt_tokens
+    - update
     - albs_jwt_token
   set_fact:
     albs_jwt: "{{ albs_jwt_token }}"
@@ -88,6 +90,7 @@
 - name: Set alts_jwt when is not set via vars.yml
   tags:
     - jwt_tokens
+    - update
     - alts_jwt_token
   block:
     - name: Generate ALTS JWT
@@ -105,13 +108,16 @@
 - name: Set alts_jwt when is set via vars.yml
   tags:
     - jwt_tokens
+    - update
     - alts_jwt_token
   set_fact:
     alts_jwt: "{{ alts_jwt_token }}"
   when: alts_jwt_token | length > 0
 
 - name: Clone ALBS sources
-  tags: clone-albs-sources
+  tags:
+    - clone-albs-sources
+    - update
   git:
     repo: "{{ item.value }}"
     dest: "{{ sources_root }}/{{ item.key }}"
@@ -126,7 +132,9 @@
     - beholder_enabled or (item.key != "repo-beholder")
 
 - name: Update ALBS sources pushurl
-  tags: update-albs-sources-pushurl
+  tags:
+    - update-albs-sources-pushurl
+    - update
   git_config:
     repo: "{{sources_root}}/{{ item.key }}"
     name: remote.origin.pushurl
@@ -138,6 +146,8 @@
     - beholder_enabled or (item.key != "repo-beholder")
 
 - name: Sync ALBS sources to remote host
+  tags:
+    - update
   synchronize:
     dest: "{{ sources_root }}"
     src: "{{ local_sources_root }}"
@@ -150,6 +160,8 @@
   when: use_already_cloned_repos and not use_local_connection
 
 - name: Build NodeJS modules for albs-frontend
+  tags:
+    - update
   shell: |
     export NVM_DIR="$HOME/.nvm"
     [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
