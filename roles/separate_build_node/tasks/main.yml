@@ -3,7 +3,7 @@
   # Most tasks need root (systemd units, dnf, sudoers, other users' homes);
   # don't rely on the host connecting as root. Tasks that must run as the
   # service user set become_user themselves.
-  become: yes
+  become: true
   block:
     # grpcio override and source-build tasks need the architecture fact;
     # gather it if facts were not collected for this play.
