@@ -19,14 +19,31 @@
   with_items: "{{ working_directories }}"
 
 - name: Generate build node config
+  tags:
+    - update
+    - update-config
   ansible.builtin.template:
     src: build_node.j2
     dest: "{{ final_conf_dir }}/build_node.yml"
     owner: "{{ service_user }}"
     group: "{{ service_group }}"
     mode: "0644"
+  register: build_node_config
+
+# Runs only with an explicit '--tags update-config'; full deploys and
+# '--tags update' restart the service in install_systemd_service.yml.
+- name: Restart build node service to apply new config
+  tags:
+    - never
+    - update-config
+  ansible.builtin.systemd:
+    name: albs-build-node.service
+    state: restarted
+  when: build_node_config is changed
 
 - name: Clone albs-node repository
+  tags:
+    - update
   become: yes
   become_user: "{{ service_user }}"
   ansible.builtin.git:
@@ -37,7 +54,23 @@
     accept_hostkey: yes
     force: yes
 
+# The clone above resets local changes (force: yes), so this re-applies
+# on every run.
+- name: Override grpcio version in albs-node requirements
+  tags:
+    - update
+    - update-env
+  become: yes
+  become_user: "{{ service_user }}"
+  ansible.builtin.replace:
+    path: "{{ build_node_requirements_path }}"
+    regexp: '^grpcio==.*$'
+    replace: "grpcio=={{ build_node_grpcio_version }}"
+  when: build_node_grpcio_version | length > 0
+
 - name: Create Python virtual environment
+  tags:
+    - update
   become: yes
   become_user: "{{ service_user }}"
   ansible.builtin.command: python3 -m venv --system-site-packages "{{ build_node_venv_directory }}"
@@ -45,18 +78,21 @@
     creates: "{{ build_node_venv_directory }}/bin/activate"
 
 - name: Upgrade pip in virtualenv
+  tags:
+    - update
   become: yes
   become_user: "{{ service_user }}"
   ansible.builtin.command: "{{ build_node_venv_directory }}/bin/pip install --upgrade pip"
 
-- name: Install s390x build requirements into virtualenv
+- name: Install source build requirements into virtualenv
   become: yes
   become_user: "{{ service_user }}"
   ansible.builtin.pip:
     name: "{{ build_node_s390x_build_requirements }}"
     virtualenv: "{{ build_node_venv_directory }}"
-  when: ansible_facts['architecture'] == 's390x'
+  when: build_node_build_from_source | bool
   tags:
+    - update
     - update-env
 
 - name: Install requirements into virtualenv
@@ -65,8 +101,9 @@
   ansible.builtin.pip:
     requirements: "{{ build_node_requirements_path }}"
     virtualenv: "{{ build_node_venv_directory }}"
-    extra_args: "{{ '--no-build-isolation' if ansible_facts['architecture'] == 's390x' else omit }}"
-  environment: "{{ build_node_s390x_pip_environment if ansible_facts['architecture'] == 's390x' else {} }}"
+    extra_args: "{{ '--no-build-isolation' if build_node_build_from_source | bool else omit }}"
+  environment: "{{ build_node_s390x_pip_environment if build_node_build_from_source | bool else {} }}"
   tags:
+    - update
     - update-env
 ...
