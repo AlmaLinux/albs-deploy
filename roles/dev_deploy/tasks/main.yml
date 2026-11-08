@@ -19,12 +19,15 @@
               tags:
                 - configs
                 - gpg
+                - update
             - import_tasks: configs.yml
               tags:
                 - configs
+                - update
             - import_tasks: services.yml
               tags:
                 - services
+                - update
             - import_tasks: misc.yml
               tags:
                 - misc

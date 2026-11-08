@@ -63,6 +63,7 @@
 - name: Regenerate ALBS JWT for the real base_user
   tags:
     - jwt_tokens
+    - update
     - albs_jwt_token
   community.docker.docker_container_exec:
     container: "{{ container_name_prefix }}_web_server_1"
@@ -75,6 +76,7 @@
 - name: Update albs_jwt fact with regenerated token
   tags:
     - jwt_tokens
+    - update
     - albs_jwt_token
   set_fact:
     albs_jwt: "{{ regenerated_albs_jwt.stdout | trim }}"
@@ -85,6 +87,7 @@
 - name: Re-render service configs with regenerated JWT
   tags:
     - jwt_tokens
+    - update
     - albs_jwt_token
     - configs
   template:
@@ -104,6 +107,7 @@
 - name: Recreate consumer containers to pick up regenerated JWT
   tags:
     - jwt_tokens
+    - update
     - albs_jwt_token
     - services
   vars:
