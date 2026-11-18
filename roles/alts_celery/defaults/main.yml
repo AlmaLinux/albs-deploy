@@ -1,6 +1,9 @@
 ---
 
 celery_venv_dir: /home/{{ test_system_user }}/.venv-celery
+# Branch, tag or commit of ALTS to deploy. Without it the git module keeps
+# whatever branch is checked out on the node.
+alts_version: master
 plugin_cache_dir: "$HOME/.terraform.d/plugin-cache"
 opennebula_endpoint:
 opennebula_user:

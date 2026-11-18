@@ -26,6 +26,8 @@
       git:
         repo: https://github.com/AlmaLinux/alts
         dest: ~/alts
+        version: "{{ alts_version }}"
+        force: true
       register: scheduler_code
       tags:
         - update
