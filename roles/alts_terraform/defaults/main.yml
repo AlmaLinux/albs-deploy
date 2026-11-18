@@ -1,5 +1,6 @@
 ---
 
 terraform_plugin_cache_dir: /home/{{ test_system_user }}/.terraform.d/plugins-cache
+docker_provider_dir: "{{ terraform_plugin_cache_dir }}/registry.terraform.io/kreuzwerker/docker/{{ docker_build_ver }}/linux_{{ node_arch }}"
 terraform_version: 1.12.1
 terraform_arch: amd64
