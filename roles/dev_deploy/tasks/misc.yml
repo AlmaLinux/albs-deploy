@@ -84,6 +84,22 @@
     - regenerated_albs_jwt is defined
     - regenerated_albs_jwt.stdout | default('') | trim | length > 0
 
+# Sets albs_build_node_jwt, the token of build_node.yml.j2; fails without it.
+# Not needed when the build_node container isn't deployed (a separate node).
+- name: Get the token of the build nodes
+  tags:
+    - jwt_tokens
+    - update
+    - albs_jwt_token
+  ansible.builtin.include_tasks:
+    file: build_node_token.yml
+    apply:
+      tags:
+        - jwt_tokens
+        - update
+        - albs_jwt_token
+  when: "'build_node' not in excluded_containers | default([])"
+
 - name: Re-render service configs with regenerated JWT
   tags:
     - jwt_tokens
@@ -99,6 +115,8 @@
   when:
     - regenerated_albs_jwt is defined
     - regenerated_albs_jwt.stdout | default('') | length > 0
+    # Without the build node token the build node config isn't rendered
+    - item.sname != 'build_node.yml.j2' or albs_build_node_jwt is defined
 
 # Recreate all non-excluded consumer containers in a single compose invocation
 # (parallel, depends_on-ordered) instead of a per-service loop. The filtered list

@@ -115,6 +115,44 @@ For this token type payload is different:
    "email":"base_user@almalinux.org"
 }
 ```
+#### Build node token
+The build nodes get their own token: a token of a build node service user of
+albs-web-server, which is accepted by `/api/v1/build_node/*` only, while the
+other services (sign node, ALTS, gitea listener, tests cacher) keep the
+superuser ALBS token. The `dev_deploy` role issues it on every run with
+`scripts/build_node_token.py` of albs-web-server for the user
+`albs_build_node_user` (`build-nodes` by default, created on the first run).
+A token shared by the nodes is issued, it doesn't expire; a new run issues one
+more token of the same user and the earlier ones stay valid. Revoke them all
+in the web-server container:
+```bash
+python3 scripts/build_node_token.py -u build-nodes --revoke
+```
+Set `albs_build_node_jwt_token` to use a token issued beforehand instead
+(e.g. a personal one, `build_node_token.py -u <user> -n <build_node_name>`).
+The build nodes never get the superuser ALBS token: if albs-web-server has no
+build node users (no `scripts/build_node_token.py`) and
+`albs_build_node_jwt_token` isn't set, the role fails. The build node config
+is rendered and the `build_node` container is started (it's in
+`pre_bootstrap_excluded_containers`) once the token is there. The token isn't
+needed when the `build_node` container isn't deployed (`excluded_containers`).
+The token is never printed, the token tasks have `no_log` (also with `-vvv`).
+The `build_node` container registers on the web server as
+`albs_dev_build_node_name` (`dev-build-node` by default): the build node names
+have to be unique and set explicitly, the container hostname changes on every
+recreate and would add a new record to the build nodes registry on every run.
+
+A build node deployed separately (`separate_build_node` role) takes its token
+from `albs_build_node_jwt_token`: issue it in the web-server container with
+`python3 scripts/build_node_token.py -u build-nodes` (shared by the nodes) or
+`-u <user> -n <build_node_name>` (one node only). It's required: the role
+fails without it and never puts the superuser `albs_jwt_token` into the node
+config. Set `build_node_name` per host to name the node:
+the names have to be unique, since the nodes with the same name share one
+record of the build nodes registry of the server. Without it albs-node takes
+the hostname without its two last domain parts, so `build01.example.com` and
+`build01.example.org` both become `build01`; the role fails if two nodes of
+the play get the same name.
 
 ## What else vars exist?
 `vars.yml` can contain extended set of variables. The most vars defaults you can see here `inventories/one_vm/group_vars/all.yml` 
@@ -135,6 +173,10 @@ alts_jwt_token: <If you have generated JWT token manually set it here>
 albs_jwt_token: <If you have generated JWT token manually set it here>
 albs_jwt_secret: <Secret of yours generated token>
 alts_jwt_secret: <Secret of yours generated token>
+# the build nodes token (see "Build node token")
+albs_build_node_user: <build node service user, `build-nodes` by default>
+albs_build_node_jwt_token: <build node token issued beforehand; empty - issue a token of albs_build_node_user>
+albs_dev_build_node_name: <build_node_name of the dev build_node container, `dev-build-node` by default>
 
 # if you want to notarize/authorize build artifacts, you need to provide
 # the following immudb configuration

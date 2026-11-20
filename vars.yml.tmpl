@@ -34,6 +34,10 @@ alts_jwt_token:
 albs_jwt_token:
 albs_jwt_secret:
 alts_jwt_secret:
+# Token of the build nodes, see "Build node token" in README.md
+# albs_build_node_user: build-nodes   # build node service user the token is issued for
+# albs_build_node_jwt_token:          # a token issued beforehand; without it the playbook issues one (no superuser fallback)
+# albs_dev_build_node_name: dev-build-node   # build_node_name of the build_node container, unique
 
 rabbitmq_erlang_cookie:
 rabbitmq_user:
@@ -53,5 +57,7 @@ immudb_database:
 immudb_address:
 immudb_public_key_file:
 albs_jwt_token:
+albs_build_node_jwt_token:    # required: token of the build node role, issued by scripts/build_node_token.py of albs-web-server
+# build_node_name:            # unique name of the node (per host), the hostname without its two last domain parts without it
 pulp_user:
 pulp_password:

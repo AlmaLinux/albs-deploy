@@ -1,7 +1,10 @@
 ---
 development_mode: true
 master_url: "http://web_server:8000/api/v1/"
-jwt_token: "{{ albs_jwt }}"
+{# A token of the build node role, see tasks/build_node_token.yml #}
+jwt_token: "{{ albs_build_node_jwt }}"
+{# Unique and explicit, the container hostname changes on every recreate #}
+build_node_name: "{{ albs_dev_build_node_name }}"
 pulp_host: "http://pulp"
 pulp_user: "{{ pulp_user }}"
 pulp_password: "{{ pulp_password }}"

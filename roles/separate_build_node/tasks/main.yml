@@ -5,6 +5,22 @@
   # service user set become_user themselves.
   become: true
   block:
+    - name: Check the build node token
+      ansible.builtin.assert:
+        that:
+          - albs_build_node_jwt_token is defined
+          - albs_build_node_jwt_token is string
+          - albs_build_node_jwt_token is match('^eyJ[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+$')
+        fail_msg: >-
+          albs_build_node_jwt_token has to be a token of the build node role,
+          the build node doesn't get the superuser albs_jwt_token. Issue it in
+          the web-server container with 'python3 scripts/build_node_token.py
+          -u build-nodes' (shared by the nodes) or '-u <user> -n
+          <build_node_name>' (one node only) and pass it with
+          -e albs_build_node_jwt_token=<token> or in vars.yml.
+        quiet: true
+      tags:
+        - always
     # grpcio override and source-build tasks need the architecture fact;
     # gather it if facts were not collected for this play.
     - name: Gather platform facts if missing

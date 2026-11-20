@@ -40,3 +40,17 @@ postgres_password: "{{ postgres_password | urlencode  }}"
 # repos from their remotes (useful for limited disk space; metadata-only
 # on-demand sync still happens on first package request).
 bootstrap_repositories_no_sync: false
+
+# Build node service user of albs-web-server: the build nodes get a token of
+# this user (tasks/build_node_token.yml), which is accepted by the build node
+# API only; they never get the superuser albs_jwt. It's created on the first
+# run by scripts/build_node_token.py of albs-web-server.
+albs_build_node_user: "build-nodes"
+# A build node token issued beforehand (scripts/build_node_token.py of
+# albs-web-server); empty - a token of albs_build_node_user is issued.
+albs_build_node_jwt_token: ""
+# Name the build_node container registers with on the web server. The node
+# names have to be unique and set explicitly: without it albs-node takes the
+# hostname of the container, which changes on every recreate, so every run
+# would add one more record to the build nodes registry.
+albs_dev_build_node_name: "dev-build-node"
