@@ -1,5 +1,8 @@
 ---
 
+# The build node config needs the build node token, which is issued by the
+# running web server: it's rendered in misc.yml then (the build_node
+# container is started after that, see pre_bootstrap_excluded_containers)
 - name: Generate a service's config
   template:
     dest: "{{ item.dest }}/{{ item.dname }}"
@@ -7,3 +10,4 @@
     mode: "{{ item.mode }}"
     force: yes
   with_items: "{{ generated_configs }}"
+  when: item.sname != 'build_node.yml.j2' or albs_build_node_jwt is defined

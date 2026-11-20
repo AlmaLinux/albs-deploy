@@ -67,7 +67,10 @@ excluded_containers:
 # so a human cannot race the bootstrap by signing in via OAuth and
 # grabbing id=1 ahead of the system user. They are started later from
 # misc.yml after the system user is created.
+# build_node needs the build node token, which is issued by the web server
+# after the bootstrap.
 pre_bootstrap_excluded_containers:
   - "nginx"
+  - "build_node"
 
 ...

@@ -15,7 +15,10 @@ working_dir: "{{ working_dir }}"
 {% if mock_basedir is defined and mock_basedir %}
 mock_basedir: "{{ mock_basedir }}"
 {% endif %}
-jwt_token: "{{ albs_jwt_token }}"
+{% if build_node_name is defined and build_node_name %}
+build_node_name: "{{ build_node_name }}"
+{% endif %}
+jwt_token: "{{ albs_build_node_jwt_token }}"
 pulp_host: "{{ pulp_host }}"
 pulp_user: "{{ pulp_user }}"
 pulp_password: "{{ pulp_password }}"

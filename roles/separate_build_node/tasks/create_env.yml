@@ -18,6 +18,32 @@
     group: "{{ service_group }}"
   with_items: "{{ working_directories }}"
 
+# The way albs-node names itself when build_node_name isn't set
+- name: Set the name the build node registers with
+  tags:
+    - update
+    - update-config
+  ansible.builtin.set_fact:
+    build_node_registered_name: >-
+      {{ build_node_name | default(ansible_facts['nodename'].rsplit('.', 2)[0], true) }}
+
+# Only the nodes of this play are compared
+- name: Check that the build node names are unique
+  tags:
+    - update
+    - update-config
+  run_once: true
+  vars:
+    build_node_names: >-
+      {{ ansible_play_hosts | map('extract', hostvars, 'build_node_registered_name') | list }}
+  ansible.builtin.assert:
+    that: build_node_names | unique | length == build_node_names | length
+    fail_msg: >-
+      The build node names {{ build_node_names }} aren't unique: the nodes with
+      the same name share one record of the build nodes registry. Set a unique
+      build_node_name for every node.
+    quiet: true
+
 - name: Generate build node config
   tags:
     - update
