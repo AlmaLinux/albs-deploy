@@ -112,11 +112,14 @@
     mode: "{{ item.mode }}"
     force: yes
   with_items: "{{ generated_configs }}"
-  when:
-    - regenerated_albs_jwt is defined
-    - regenerated_albs_jwt.stdout | default('') | length > 0
-    # Without the build node token the build node config isn't rendered
-    - item.sname != 'build_node.yml.j2' or albs_build_node_jwt is defined
+  # The build node config doesn't use albs_jwt: it's rendered whenever the
+  # build node token is there and only then (configs.yml skips it), so the
+  # build_node container below never starts without its config.
+  when: >-
+    (item.sname == 'build_node.yml.j2' and albs_build_node_jwt is defined)
+    or (item.sname != 'build_node.yml.j2'
+        and regenerated_albs_jwt is defined
+        and regenerated_albs_jwt.stdout | default('') | length > 0)
 
 # Recreate all non-excluded consumer containers in a single compose invocation
 # (parallel, depends_on-ordered) instead of a per-service loop. The filtered list
@@ -144,14 +147,56 @@
     - services is defined
     - consumer_services | length > 0
 
+# build_node is deferred (pre_bootstrap_excluded_containers) until its token
+# is issued. It's (re)created here, also by '--tags update' / 'jwt_tokens' /
+# 'albs_jwt_token' which re-render its config: the config is a bind-mounted
+# file and the template replaces it, so the running container keeps the old
+# file and token until it's recreated. Without the config compose would
+# create a directory in its place, so the container isn't started then.
+- name: Check that the build node config is rendered
+  tags:
+    - jwt_tokens
+    - update
+    - albs_jwt_token
+  ansible.builtin.assert:
+    that: albs_build_node_jwt is defined
+    fail_msg: >-
+      There is no build node token (tasks/build_node_token.yml), so the build
+      node config isn't rendered and the build_node container isn't started:
+      compose would create a directory in place of its config. Don't skip the
+      build node token tasks or exclude build_node with excluded_containers.
+    quiet: true
+  when: "'build_node' not in excluded_containers | default([])"
+
+- name: Recreate the build_node container with the build node token
+  tags:
+    - jwt_tokens
+    - update
+    - albs_jwt_token
+  ansible.builtin.command:
+    cmd: >-
+      {{ docker_compose | default('docker compose') }}
+      -p {{ container_name_prefix }} --compatibility
+      up -d --build --force-recreate build_node
+    chdir: "{{ sources_root }}/albs-web-server"
+  when: "'build_node' not in excluded_containers | default([])"
+
+# The excluded containers stay down, build_node is started above. The filtered
+# list is guarded so an empty arg list never makes 'docker compose up' start
+# ALL services.
 - name: Start containers deferred until after bootstrap
+  vars:
+    deferred_services: >-
+      {{ pre_bootstrap_excluded_containers | default([])
+         | difference(excluded_containers | default([]))
+         | difference(['build_node']) }}
   shell: >-
     {{ docker_compose }} -p {{ container_name_prefix }} --compatibility
     up -d --build --force-recreate
-    {{ pre_bootstrap_excluded_containers | default([]) | join(' ') }}
+    {{ deferred_services | join(' ') }}
   args:
     chdir: "{{ sources_root }}/albs-web-server"
-  when: pre_bootstrap_excluded_containers | default([]) | length > 0
+  when: deferred_services | length > 0
 
 - name: Checking if GPG key exists on web_server
   tags: add_pgp_to_web_server

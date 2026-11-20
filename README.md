@@ -134,8 +134,10 @@ The build nodes never get the superuser ALBS token: if albs-web-server has no
 build node users (no `scripts/build_node_token.py`) and
 `albs_build_node_jwt_token` isn't set, the role fails. The build node config
 is rendered and the `build_node` container is started (it's in
-`pre_bootstrap_excluded_containers`) once the token is there. The token isn't
-needed when the `build_node` container isn't deployed (`excluded_containers`).
+`pre_bootstrap_excluded_containers`) once the token is there, `--tags update`
+(`jwt_tokens`, `albs_jwt_token`) re-renders the config and recreates the
+container too. The token isn't needed and the container isn't started when
+`build_node` is in `excluded_containers`.
 The token is never printed, the token tasks have `no_log` (also with `-vvv`).
 The `build_node` container registers on the web server as
 `albs_dev_build_node_name` (`dev-build-node` by default): the build node names
